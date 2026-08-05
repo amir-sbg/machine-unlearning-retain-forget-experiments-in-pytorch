@@ -1,4 +1,4 @@
-# Machine Unlearning Lab
+# Machine Unlearning Lab - Retain–Forget Experiments in PyTorch
 
 Small PyTorch project for experimenting with machine unlearning. The goal is to compare what a model knows before and after removing a target class from training influence, while keeping an exact retrain baseline as the reference point.
 
