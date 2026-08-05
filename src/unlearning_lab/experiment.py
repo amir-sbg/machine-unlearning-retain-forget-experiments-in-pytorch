@@ -21,7 +21,7 @@ from .metrics import (
     save_json,
 )
 from .model import DigitMLP, count_parameters
-from .train import TrainingConfig, train_classifier
+from .train import TrainingConfig, set_seed, train_classifier
 from .unlearn import (
     UnlearnConfig,
     negative_gradient_unlearn,
@@ -66,6 +66,11 @@ def _training_config(config: ExperimentConfig, epochs: int | None = None) -> Tra
     )
 
 
+def _new_model(config: ExperimentConfig) -> DigitMLP:
+    set_seed(config.seed)
+    return DigitMLP(hidden_dim=128, dropout=0.10)
+
+
 def _flatten_metrics(metrics: dict[str, dict]) -> dict[str, float | int | str]:
     row: dict[str, float | int | str] = {}
     for split_name, values in metrics.items():
@@ -106,15 +111,13 @@ def run_experiment(config: ExperimentConfig) -> dict:
 
     data = load_unlearning_data(forget_class=config.forget_class, seed=config.seed)
     full_train = join_splits(data.train_retain, data.train_forget)
-    model_kwargs = {"hidden_dim": 128, "dropout": 0.10}
-
     histories: dict[str, list[dict[str, float]]] = {}
     timings: dict[str, float] = {}
     models: dict[str, torch.nn.Module] = {}
 
     start = time.perf_counter()
     full_result = train_classifier(
-        DigitMLP(**model_kwargs),
+        _new_model(config),
         full_train,
         data.validation,
         _training_config(config),
@@ -127,7 +130,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     # Exact retrain is not the cheap method; it is the reference point for the cheaper ones.
     start = time.perf_counter()
     retrain_result = train_classifier(
-        DigitMLP(**model_kwargs),
+        _new_model(config),
         data.train_retain,
         data.validation,
         _training_config(config),
