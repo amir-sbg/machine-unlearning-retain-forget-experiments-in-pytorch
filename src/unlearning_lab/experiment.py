@@ -39,6 +39,8 @@ class ExperimentConfig:
     batch_size: int = 64
     learning_rate: float = 1e-3
     unlearn_steps: int = 80
+    hidden_dim: int = 128
+    dropout: float = 0.10
     output_dir: Path = Path("artifacts")
     report_dir: Path = Path("reports")
     device: str = "auto"
@@ -68,8 +70,12 @@ def _training_config(config: ExperimentConfig, epochs: int | None = None) -> Tra
 
 
 def _new_model(config: ExperimentConfig) -> DigitMLP:
+    if config.hidden_dim < 16:
+        raise ValueError("hidden_dim must be at least 16")
+    if not 0.0 <= config.dropout < 1.0:
+        raise ValueError("dropout must be in [0, 1)")
     set_seed(config.seed)
-    return DigitMLP(hidden_dim=128, dropout=0.10)
+    return DigitMLP(hidden_dim=config.hidden_dim, dropout=config.dropout)
 
 
 def _flatten_metrics(metrics: dict[str, dict]) -> dict[str, float | int | str]:
@@ -206,6 +212,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
             "config": {**asdict(config), "output_dir": str(config.output_dir), "report_dir": str(config.report_dir)},
             "device": str(device),
             "parameter_count": count_parameters(models["full_model"]),
+            "model": {
+                "hidden_dim": config.hidden_dim,
+                "dropout": config.dropout,
+            },
             "methods": list(models),
             "timings": timings,
             "best_method_by_retrain_gap": scorecard[0]["method"],
@@ -249,6 +259,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size", type=int, default=ExperimentConfig.batch_size)
     parser.add_argument("--learning-rate", type=float, default=ExperimentConfig.learning_rate)
     parser.add_argument("--unlearn-steps", type=int, default=ExperimentConfig.unlearn_steps)
+    parser.add_argument("--hidden-dim", type=int, default=ExperimentConfig.hidden_dim)
+    parser.add_argument("--dropout", type=float, default=ExperimentConfig.dropout)
     parser.add_argument("--output-dir", type=Path, default=ExperimentConfig.output_dir)
     parser.add_argument("--report-dir", type=Path, default=ExperimentConfig.report_dir)
     parser.add_argument("--device", default=ExperimentConfig.device)

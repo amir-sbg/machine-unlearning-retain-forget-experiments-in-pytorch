@@ -32,7 +32,9 @@ For a quick smoke run:
 python -m unlearning_lab.experiment \
   --forget-class 8 \
   --epochs 5 \
-  --unlearn-steps 10
+  --unlearn-steps 10 \
+  --hidden-dim 96 \
+  --dropout 0.1
 ```
 
 ## Outputs
