@@ -43,6 +43,7 @@ reports/
 ├── experiment_summary.json
 ├── method_metrics.csv
 ├── method_metrics.json
+├── method_scorecard.csv
 ├── retrain_gaps.json
 ├── unlearning_tradeoff.png
 └── *_history.csv
@@ -52,7 +53,7 @@ artifacts/
 └── exact_retrain.pt
 ```
 
-`method_metrics.csv` is the main file to inspect. A good unlearning method should reduce confidence on the forgotten class while keeping retain-class accuracy close to the exact retrain baseline.
+`method_metrics.csv` is the detailed output. `method_scorecard.csv` is the compact ranking table. A good unlearning method should reduce confidence on the forgotten class while keeping retain-class accuracy close to the exact retrain baseline.
 
 ## Project structure
 

@@ -18,6 +18,7 @@ from .data import Split, dataset_summary, load_unlearning_data
 from .metrics import (
     compare_to_exact_retrain,
     evaluate_unlearning_model,
+    method_scorecard,
     save_json,
 )
 from .model import DigitMLP, count_parameters
@@ -180,6 +181,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         for name, model in models.items()
     }
     retrain_gaps = compare_to_exact_retrain(method_metrics)
+    scorecard = method_scorecard(method_metrics, timings)
     metrics_frame = pd.DataFrame(
         [
             {
@@ -193,9 +195,11 @@ def run_experiment(config: ExperimentConfig) -> dict:
     )
 
     metrics_frame.to_csv(config.report_dir / "method_metrics.csv", index=False)
+    pd.DataFrame(scorecard).to_csv(config.report_dir / "method_scorecard.csv", index=False)
     save_tradeoff_plot(metrics_frame, config.report_dir / "unlearning_tradeoff.png")
     save_json(method_metrics, config.report_dir / "method_metrics.json")
     save_json(retrain_gaps, config.report_dir / "retrain_gaps.json")
+    save_json({"methods": scorecard}, config.report_dir / "method_scorecard.json")
     save_json(dataset_summary(data), config.report_dir / "data_summary.json")
     save_json(
         {
@@ -204,9 +208,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
             "parameter_count": count_parameters(models["full_model"]),
             "methods": list(models),
             "timings": timings,
-            "best_method_by_retrain_gap": metrics_frame.sort_values(
-                ["forget_confidence_gap", "retain_accuracy_gap"]
-            ).iloc[0]["method"],
+            "best_method_by_retrain_gap": scorecard[0]["method"],
         },
         config.report_dir / "experiment_summary.json",
     )
@@ -234,6 +236,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     return {
         "method_metrics": method_metrics,
         "retrain_gaps": retrain_gaps,
+        "scorecard": scorecard,
         "summary_path": str(config.report_dir / "experiment_summary.json"),
     }
 

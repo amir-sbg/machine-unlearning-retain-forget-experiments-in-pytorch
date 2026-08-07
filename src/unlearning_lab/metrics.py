@@ -98,6 +98,39 @@ def compare_to_exact_retrain(
     return rows
 
 
+def method_scorecard(
+    method_metrics: dict[str, dict],
+    timings: dict[str, float] | None = None,
+    exact_key: str = "exact_retrain",
+) -> list[dict[str, float | str | bool]]:
+    gaps = compare_to_exact_retrain(method_metrics, exact_key=exact_key)
+    timings = timings or {}
+    rows = []
+    for name, metrics in method_metrics.items():
+        gap = gaps[name]
+        test = metrics["test"]
+        total_gap = (
+            gap["retain_accuracy_gap"]
+            + gap["forget_confidence_gap"]
+            + gap["forget_accuracy_gap"]
+        )
+        rows.append(
+            {
+                "method": name,
+                "is_exact_retrain": name == exact_key,
+                "runtime_seconds": float(timings.get(name, 0.0)),
+                "test_retain_accuracy": float(test["retain_accuracy"]),
+                "test_forget_accuracy": float(test["forget_accuracy"]),
+                "test_forget_confidence": float(test["forget_confidence"]),
+                "retain_accuracy_gap": gap["retain_accuracy_gap"],
+                "forget_confidence_gap": gap["forget_confidence_gap"],
+                "forget_accuracy_gap": gap["forget_accuracy_gap"],
+                "total_retrain_gap": float(total_gap),
+            }
+        )
+    return sorted(rows, key=lambda row: (row["total_retrain_gap"], row["runtime_seconds"]))
+
+
 def save_json(value: dict, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n")

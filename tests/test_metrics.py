@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-from unlearning_lab.metrics import compare_to_exact_retrain, split_metrics
+from unlearning_lab.metrics import (
+    compare_to_exact_retrain,
+    method_scorecard,
+    split_metrics,
+)
 
 
 def test_split_metrics_reports_forget_confidence() -> None:
@@ -48,3 +52,28 @@ def test_compare_to_exact_retrain_returns_gaps() -> None:
 
     assert gaps["cheap_method"]["retain_accuracy_gap"] == pytest.approx(0.05)
     assert gaps["cheap_method"]["forget_confidence_gap"] == pytest.approx(0.15)
+
+
+def test_method_scorecard_ranks_by_retrain_gap() -> None:
+    metrics = {
+        "exact_retrain": {
+            "test": {
+                "retain_accuracy": 0.95,
+                "forget_confidence": 0.10,
+                "forget_accuracy": 0.05,
+            }
+        },
+        "cheap_method": {
+            "test": {
+                "retain_accuracy": 0.90,
+                "forget_confidence": 0.25,
+                "forget_accuracy": 0.20,
+            }
+        },
+    }
+
+    rows = method_scorecard(metrics, timings={"cheap_method": 0.2})
+
+    assert rows[0]["method"] == "exact_retrain"
+    assert rows[1]["runtime_seconds"] == 0.2
+    assert rows[1]["total_retrain_gap"] == pytest.approx(0.35)
