@@ -59,7 +59,7 @@ def test_compare_to_exact_retrain_returns_gaps() -> None:
     assert gaps["cheap_method"]["forget_confidence_gap"] == pytest.approx(0.15)
 
 
-def test_method_scorecard_ranks_by_retrain_gap() -> None:
+def test_method_scorecard_ranks_by_retrain_gap_and_reports_speedup() -> None:
     metrics = {
         "exact_retrain": {
             "test": {
@@ -77,8 +77,9 @@ def test_method_scorecard_ranks_by_retrain_gap() -> None:
         },
     }
 
-    rows = method_scorecard(metrics, timings={"cheap_method": 0.2})
+    rows = method_scorecard(metrics, timings={"exact_retrain": 1.0, "cheap_method": 0.2})
 
     assert rows[0]["method"] == "exact_retrain"
     assert rows[1]["runtime_seconds"] == 0.2
+    assert rows[1]["speedup_vs_exact_retrain"] == pytest.approx(5.0)
     assert rows[1]["total_retrain_gap"] == pytest.approx(0.35)

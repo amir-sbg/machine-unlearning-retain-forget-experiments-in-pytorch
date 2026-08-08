@@ -107,10 +107,13 @@ def method_scorecard(
 ) -> list[dict[str, float | str | bool]]:
     gaps = compare_to_exact_retrain(method_metrics, exact_key=exact_key)
     timings = timings or {}
+    exact_runtime = float(timings.get(exact_key, 0.0))
     rows = []
     for name, metrics in method_metrics.items():
         gap = gaps[name]
         test = metrics["test"]
+        runtime = float(timings.get(name, 0.0))
+        speedup = exact_runtime / runtime if exact_runtime > 0.0 and runtime > 0.0 else 0.0
         total_gap = (
             gap["retain_accuracy_gap"]
             + gap["forget_confidence_gap"]
@@ -120,7 +123,8 @@ def method_scorecard(
             {
                 "method": name,
                 "is_exact_retrain": name == exact_key,
-                "runtime_seconds": float(timings.get(name, 0.0)),
+                "runtime_seconds": runtime,
+                "speedup_vs_exact_retrain": float(speedup),
                 "test_retain_accuracy": float(test["retain_accuracy"]),
                 "test_forget_accuracy": float(test["forget_accuracy"]),
                 "test_forget_confidence": float(test["forget_confidence"]),
