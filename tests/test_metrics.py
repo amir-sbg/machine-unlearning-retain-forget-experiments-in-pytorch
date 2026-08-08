@@ -30,6 +30,11 @@ def test_split_metrics_rejects_bad_shapes() -> None:
         split_metrics(np.array([0, 1]), np.zeros((3, 2)), forget_class=1)
 
 
+def test_split_metrics_rejects_unknown_forget_class() -> None:
+    with pytest.raises(ValueError, match="forget_class"):
+        split_metrics(np.array([0, 1]), np.zeros((2, 2)), forget_class=3)
+
+
 def test_compare_to_exact_retrain_returns_gaps() -> None:
     metrics = {
         "exact_retrain": {
