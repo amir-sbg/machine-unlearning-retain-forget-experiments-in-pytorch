@@ -139,6 +139,33 @@ def method_scorecard(
     return sorted(rows, key=lambda row: (row["total_retrain_gap"], row["runtime_seconds"]))
 
 
+def pareto_frontier(
+    scorecard: list[dict[str, float | str | bool]],
+    runtime_key: str = "runtime_seconds",
+    gap_key: str = "total_retrain_gap",
+) -> list[dict[str, float | str | bool]]:
+    frontier = []
+    for candidate in scorecard:
+        candidate_time = float(candidate[runtime_key])
+        candidate_gap = float(candidate[gap_key])
+        dominated = False
+        for other in scorecard:
+            if other is candidate:
+                continue
+            other_time = float(other[runtime_key])
+            other_gap = float(other[gap_key])
+            if other_time <= candidate_time and other_gap <= candidate_gap:
+                if other_time < candidate_time or other_gap < candidate_gap:
+                    dominated = True
+                    break
+        if not dominated:
+            frontier.append(dict(candidate))
+    return sorted(
+        frontier,
+        key=lambda row: (float(row[runtime_key]), float(row[gap_key]), str(row["method"])),
+    )
+
+
 def save_json(value: dict, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n")
