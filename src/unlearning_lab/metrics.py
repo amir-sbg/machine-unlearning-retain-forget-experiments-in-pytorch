@@ -30,6 +30,8 @@ def split_metrics(
         raise ValueError("labels and logits must have matching rows")
     if len(labels) == 0:
         raise ValueError("labels and logits must not be empty")
+    if not np.all(np.isfinite(logits)):
+        raise ValueError("logits must contain only finite values")
     if not 0 <= forget_class < logits.shape[1]:
         raise ValueError("forget_class must be inside the logits class dimension")
 
