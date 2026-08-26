@@ -3,6 +3,7 @@ import pytest
 
 from unlearning_lab.metrics import (
     compare_to_exact_retrain,
+    distribution_gap_summary,
     membership_signal_summary,
     method_scorecard,
     pareto_frontier,
@@ -67,6 +68,31 @@ def test_membership_signal_rejects_mixed_forget_split() -> None:
             np.zeros((2, 2)),
             np.array([1]),
             np.zeros((1, 2)),
+            forget_class=1,
+        )
+
+
+def test_distribution_gap_compares_probability_profiles() -> None:
+    labels = np.array([0, 1, 1])
+    reference = np.array([[3.0, 0.0], [0.0, 3.0], [0.2, 2.0]])
+    same = reference.copy()
+    shifted = np.array([[0.0, 3.0], [2.0, 0.0], [1.5, 0.0]])
+
+    exact = distribution_gap_summary(labels, reference, same, forget_class=1)
+    report = distribution_gap_summary(labels, reference, shifted, forget_class=1)
+
+    assert exact["mean_js_divergence_to_retrain"] == pytest.approx(0.0)
+    assert report["mean_js_divergence_to_retrain"] > 0
+    assert report["forget_js_divergence_to_retrain"] > 0
+    assert report["prediction_disagreement_to_retrain"] > 0
+
+
+def test_distribution_gap_rejects_shape_mismatch() -> None:
+    with pytest.raises(ValueError, match="same shape"):
+        distribution_gap_summary(
+            np.array([0, 1]),
+            np.zeros((2, 2)),
+            np.zeros((2, 3)),
             forget_class=1,
         )
 

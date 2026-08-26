@@ -124,6 +124,45 @@ def membership_signal_summary(
     }
 
 
+def _mean_or_zero(values: np.ndarray) -> float:
+    if values.size == 0:
+        return 0.0
+    return float(np.mean(values))
+
+
+def distribution_gap_summary(
+    labels: np.ndarray,
+    reference_logits: np.ndarray,
+    candidate_logits: np.ndarray,
+    forget_class: int,
+) -> dict[str, float]:
+    labels, reference_logits = _checked_labels_logits(labels, reference_logits, forget_class)
+    _, candidate_logits = _checked_labels_logits(labels, candidate_logits, forget_class)
+    if reference_logits.shape != candidate_logits.shape:
+        raise ValueError("reference_logits and candidate_logits must have the same shape")
+
+    reference = np.clip(softmax(reference_logits), 1e-12, 1.0)
+    candidate = np.clip(softmax(candidate_logits), 1e-12, 1.0)
+    midpoint = 0.5 * (reference + candidate)
+    js = 0.5 * np.sum(reference * np.log(reference / midpoint), axis=1)
+    js += 0.5 * np.sum(candidate * np.log(candidate / midpoint), axis=1)
+
+    retain_mask = labels != forget_class
+    forget_mask = labels == forget_class
+    reference_predictions = reference.argmax(axis=1)
+    candidate_predictions = candidate.argmax(axis=1)
+    max_probability_shift = np.abs(candidate.max(axis=1) - reference.max(axis=1))
+    return {
+        "mean_js_divergence_to_retrain": _mean_or_zero(js),
+        "retain_js_divergence_to_retrain": _mean_or_zero(js[retain_mask]),
+        "forget_js_divergence_to_retrain": _mean_or_zero(js[forget_mask]),
+        "prediction_disagreement_to_retrain": float(
+            np.mean(candidate_predictions != reference_predictions)
+        ),
+        "mean_max_probability_shift": _mean_or_zero(max_probability_shift),
+    }
+
+
 def evaluate_model(
     model: nn.Module,
     split: Split,

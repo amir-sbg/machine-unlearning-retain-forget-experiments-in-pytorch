@@ -17,6 +17,7 @@ import torch
 from .data import Split, dataset_summary, load_unlearning_data
 from .metrics import (
     compare_to_exact_retrain,
+    distribution_gap_summary,
     evaluate_unlearning_model,
     membership_signal_summary,
     method_scorecard,
@@ -195,6 +196,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
         name: evaluate_unlearning_model(model, data, device)
         for name, model in models.items()
     }
+    test_logits = {
+        name: predict_logits(model, data.test, device)
+        for name, model in models.items()
+    }
     test_forget = select_class(data.test, data.forget_class)
     membership_signals = {
         name: membership_signal_summary(
@@ -205,6 +210,15 @@ def run_experiment(config: ExperimentConfig) -> dict:
             data.forget_class,
         )
         for name, model in models.items()
+    }
+    distribution_gaps = {
+        name: distribution_gap_summary(
+            data.test.labels,
+            test_logits["exact_retrain"],
+            logits,
+            data.forget_class,
+        )
+        for name, logits in test_logits.items()
     }
     retrain_gaps = compare_to_exact_retrain(method_metrics)
     scorecard = method_scorecard(method_metrics, timings)
@@ -217,6 +231,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 **_flatten_metrics(metrics),
                 **retrain_gaps[name],
                 **membership_signals[name],
+                **distribution_gaps[name],
             }
             for name, metrics in method_metrics.items()
         ]
@@ -228,6 +243,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_tradeoff_plot(metrics_frame, config.report_dir / "unlearning_tradeoff.png")
     save_json(method_metrics, config.report_dir / "method_metrics.json")
     save_json(membership_signals, config.report_dir / "membership_signals.json")
+    save_json(distribution_gaps, config.report_dir / "probability_drift.json")
     save_json(retrain_gaps, config.report_dir / "retrain_gaps.json")
     save_json({"methods": scorecard}, config.report_dir / "method_scorecard.json")
     save_json({"methods": frontier}, config.report_dir / "method_frontier.json")
@@ -248,6 +264,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
             "lowest_membership_signal": min(
                 membership_signals,
                 key=lambda name: membership_signals[name]["membership_signal"],
+            ),
+            "closest_probability_profile": min(
+                distribution_gaps,
+                key=lambda name: distribution_gaps[name]["mean_js_divergence_to_retrain"],
             ),
         },
         config.report_dir / "experiment_summary.json",
@@ -276,6 +296,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     return {
         "method_metrics": method_metrics,
         "membership_signals": membership_signals,
+        "distribution_gaps": distribution_gaps,
         "retrain_gaps": retrain_gaps,
         "scorecard": scorecard,
         "pareto_frontier": frontier,

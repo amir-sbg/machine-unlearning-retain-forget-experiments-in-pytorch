@@ -14,6 +14,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - last-layer reset for the forgotten class
 - metrics for retain accuracy, forget accuracy, forget-class confidence, and distance from exact retraining
 - membership-style forget diagnostics comparing train-forget confidence/loss against held-out forget examples
+- Jensen-Shannon probability drift against the exact retrain baseline
 - scorecard runtime speedup against exact retraining
 - a small notebook for reviewing the generated result table
 
@@ -49,6 +50,7 @@ reports/
 ├── method_metrics.csv
 ├── method_metrics.json
 ├── method_scorecard.csv
+├── probability_drift.json
 ├── retrain_gaps.json
 ├── unlearning_tradeoff.png
 └── *_history.csv
