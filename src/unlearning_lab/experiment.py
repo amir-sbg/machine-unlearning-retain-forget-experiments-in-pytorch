@@ -18,12 +18,13 @@ from .data import Split, dataset_summary, load_unlearning_data
 from .metrics import (
     compare_to_exact_retrain,
     evaluate_unlearning_model,
+    membership_signal_summary,
     method_scorecard,
     pareto_frontier,
     save_json,
 )
 from .model import DigitMLP, count_parameters
-from .train import TrainingConfig, set_seed, train_classifier
+from .train import TrainingConfig, predict_logits, set_seed, train_classifier
 from .unlearn import (
     UnlearnConfig,
     negative_gradient_unlearn,
@@ -58,6 +59,13 @@ def join_splits(first: Split, second: Split) -> Split:
         features=np.concatenate([first.features, second.features], axis=0),
         labels=np.concatenate([first.labels, second.labels], axis=0),
     )
+
+
+def select_class(split: Split, class_id: int) -> Split:
+    mask = split.labels == class_id
+    if not np.any(mask):
+        raise ValueError(f"split does not contain class {class_id}")
+    return Split(features=split.features[mask], labels=split.labels[mask])
 
 
 def _training_config(config: ExperimentConfig, epochs: int | None = None) -> TrainingConfig:
@@ -187,6 +195,17 @@ def run_experiment(config: ExperimentConfig) -> dict:
         name: evaluate_unlearning_model(model, data, device)
         for name, model in models.items()
     }
+    test_forget = select_class(data.test, data.forget_class)
+    membership_signals = {
+        name: membership_signal_summary(
+            data.train_forget.labels,
+            predict_logits(model, data.train_forget, device),
+            test_forget.labels,
+            predict_logits(model, test_forget, device),
+            data.forget_class,
+        )
+        for name, model in models.items()
+    }
     retrain_gaps = compare_to_exact_retrain(method_metrics)
     scorecard = method_scorecard(method_metrics, timings)
     frontier = pareto_frontier(scorecard)
@@ -197,6 +216,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 "runtime_seconds": timings.get(name, 0.0),
                 **_flatten_metrics(metrics),
                 **retrain_gaps[name],
+                **membership_signals[name],
             }
             for name, metrics in method_metrics.items()
         ]
@@ -207,6 +227,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     pd.DataFrame(frontier).to_csv(config.report_dir / "method_frontier.csv", index=False)
     save_tradeoff_plot(metrics_frame, config.report_dir / "unlearning_tradeoff.png")
     save_json(method_metrics, config.report_dir / "method_metrics.json")
+    save_json(membership_signals, config.report_dir / "membership_signals.json")
     save_json(retrain_gaps, config.report_dir / "retrain_gaps.json")
     save_json({"methods": scorecard}, config.report_dir / "method_scorecard.json")
     save_json({"methods": frontier}, config.report_dir / "method_frontier.json")
@@ -224,6 +245,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
             "timings": timings,
             "best_method_by_retrain_gap": scorecard[0]["method"],
             "pareto_frontier": [row["method"] for row in frontier],
+            "lowest_membership_signal": min(
+                membership_signals,
+                key=lambda name: membership_signals[name]["membership_signal"],
+            ),
         },
         config.report_dir / "experiment_summary.json",
     )
@@ -250,6 +275,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
 
     return {
         "method_metrics": method_metrics,
+        "membership_signals": membership_signals,
         "retrain_gaps": retrain_gaps,
         "scorecard": scorecard,
         "pareto_frontier": frontier,

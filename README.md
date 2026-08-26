@@ -13,6 +13,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - negative-gradient unlearning with retain loss mixed in
 - last-layer reset for the forgotten class
 - metrics for retain accuracy, forget accuracy, forget-class confidence, and distance from exact retraining
+- membership-style forget diagnostics comparing train-forget confidence/loss against held-out forget examples
 - scorecard runtime speedup against exact retraining
 - a small notebook for reviewing the generated result table
 
@@ -44,6 +45,7 @@ python -m unlearning_lab.experiment \
 reports/
 ├── data_summary.json
 ├── experiment_summary.json
+├── membership_signals.json
 ├── method_metrics.csv
 ├── method_metrics.json
 ├── method_scorecard.csv

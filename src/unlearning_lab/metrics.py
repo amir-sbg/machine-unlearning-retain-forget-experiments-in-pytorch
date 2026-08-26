@@ -11,17 +11,11 @@ from .data import Split, UnlearningData
 from .train import predict_logits
 
 
-def softmax(logits: np.ndarray) -> np.ndarray:
-    shifted = logits - logits.max(axis=1, keepdims=True)
-    exp = np.exp(shifted)
-    return exp / exp.sum(axis=1, keepdims=True)
-
-
-def split_metrics(
+def _checked_labels_logits(
     labels: np.ndarray,
     logits: np.ndarray,
     forget_class: int,
-) -> dict[str, float | int]:
+) -> tuple[np.ndarray, np.ndarray]:
     labels = np.asarray(labels)
     logits = np.asarray(logits)
     if labels.ndim != 1 or logits.ndim != 2:
@@ -34,6 +28,21 @@ def split_metrics(
         raise ValueError("logits must contain only finite values")
     if not 0 <= forget_class < logits.shape[1]:
         raise ValueError("forget_class must be inside the logits class dimension")
+    return labels, logits
+
+
+def softmax(logits: np.ndarray) -> np.ndarray:
+    shifted = logits - logits.max(axis=1, keepdims=True)
+    exp = np.exp(shifted)
+    return exp / exp.sum(axis=1, keepdims=True)
+
+
+def split_metrics(
+    labels: np.ndarray,
+    logits: np.ndarray,
+    forget_class: int,
+) -> dict[str, float | int]:
+    labels, logits = _checked_labels_logits(labels, logits, forget_class)
 
     probabilities = softmax(logits)
     predictions = probabilities.argmax(axis=1)
@@ -60,6 +69,59 @@ def split_metrics(
         result["forget_rows"] = 0
         result["forget_confidence"] = 0.0
     return result
+
+
+def _true_label_stats(labels: np.ndarray, logits: np.ndarray) -> dict[str, float | int]:
+    probabilities = np.clip(softmax(logits), 1e-12, 1.0)
+    rows = np.arange(len(labels))
+    true_probabilities = probabilities[rows, labels]
+    nll = -np.log(true_probabilities)
+    return {
+        "rows": int(len(labels)),
+        "true_label_confidence": float(np.mean(true_probabilities)),
+        "true_label_nll": float(np.mean(nll)),
+    }
+
+
+def membership_signal_summary(
+    train_forget_labels: np.ndarray,
+    train_forget_logits: np.ndarray,
+    holdout_forget_labels: np.ndarray,
+    holdout_forget_logits: np.ndarray,
+    forget_class: int,
+) -> dict[str, float | int]:
+    train_labels, train_logits = _checked_labels_logits(
+        train_forget_labels,
+        train_forget_logits,
+        forget_class,
+    )
+    holdout_labels, holdout_logits = _checked_labels_logits(
+        holdout_forget_labels,
+        holdout_forget_logits,
+        forget_class,
+    )
+    if not np.all(train_labels == forget_class):
+        raise ValueError("train_forget_labels must contain only the forget class")
+    if not np.all(holdout_labels == forget_class):
+        raise ValueError("holdout_forget_labels must contain only the forget class")
+
+    train = _true_label_stats(train_labels, train_logits)
+    holdout = _true_label_stats(holdout_labels, holdout_logits)
+    confidence_gap = float(
+        train["true_label_confidence"] - holdout["true_label_confidence"]
+    )
+    nll_gap = float(holdout["true_label_nll"] - train["true_label_nll"])
+    return {
+        "train_forget_rows": train["rows"],
+        "holdout_forget_rows": holdout["rows"],
+        "train_forget_true_confidence": train["true_label_confidence"],
+        "holdout_forget_true_confidence": holdout["true_label_confidence"],
+        "confidence_gap_train_minus_holdout": confidence_gap,
+        "train_forget_nll": train["true_label_nll"],
+        "holdout_forget_nll": holdout["true_label_nll"],
+        "nll_gap_holdout_minus_train": nll_gap,
+        "membership_signal": float(max(0.0, confidence_gap) + max(0.0, nll_gap)),
+    }
 
 
 def evaluate_model(

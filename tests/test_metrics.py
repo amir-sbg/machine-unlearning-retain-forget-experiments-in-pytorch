@@ -3,6 +3,7 @@ import pytest
 
 from unlearning_lab.metrics import (
     compare_to_exact_retrain,
+    membership_signal_summary,
     method_scorecard,
     pareto_frontier,
     split_metrics,
@@ -41,6 +42,33 @@ def test_split_metrics_rejects_non_finite_logits() -> None:
 
     with pytest.raises(ValueError, match="finite"):
         split_metrics(np.array([0, 1]), logits, forget_class=1)
+
+
+def test_membership_signal_compares_train_and_holdout_forget_examples() -> None:
+    report = membership_signal_summary(
+        train_forget_labels=np.array([1, 1]),
+        train_forget_logits=np.array([[0.2, 3.0], [0.1, 2.5]]),
+        holdout_forget_labels=np.array([1, 1]),
+        holdout_forget_logits=np.array([[0.2, 1.0], [0.4, 1.2]]),
+        forget_class=1,
+    )
+
+    assert report["train_forget_rows"] == 2
+    assert report["holdout_forget_rows"] == 2
+    assert report["confidence_gap_train_minus_holdout"] > 0
+    assert report["nll_gap_holdout_minus_train"] > 0
+    assert report["membership_signal"] > 0
+
+
+def test_membership_signal_rejects_mixed_forget_split() -> None:
+    with pytest.raises(ValueError, match="only the forget class"):
+        membership_signal_summary(
+            np.array([1, 0]),
+            np.zeros((2, 2)),
+            np.array([1]),
+            np.zeros((1, 2)),
+            forget_class=1,
+        )
 
 
 def test_compare_to_exact_retrain_returns_gaps() -> None:
