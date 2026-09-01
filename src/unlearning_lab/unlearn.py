@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import itertools
+import math
 from dataclasses import dataclass
 
 import torch
@@ -67,6 +68,29 @@ def reset_output_class(
         if layer.bias is not None:
             layer.bias[class_id].zero_()
     return scrubbed
+
+
+def dampen_output_class(
+    model: nn.Module,
+    class_id: int,
+    weight_scale: float = 0.35,
+    bias_shift: float = -1.0,
+) -> nn.Module:
+    if not 0.0 <= weight_scale <= 1.0:
+        raise ValueError("weight_scale must be in [0, 1]")
+    if not math.isfinite(bias_shift):
+        raise ValueError("bias_shift must be finite")
+
+    dampened = clone_model(model)
+    layer = _last_linear_layer(dampened)
+    if not 0 <= class_id < layer.out_features:
+        raise ValueError("class_id is outside the output layer")
+
+    with torch.no_grad():
+        layer.weight[class_id].mul_(weight_scale)
+        if layer.bias is not None:
+            layer.bias[class_id].add_(bias_shift)
+    return dampened
 
 
 def negative_gradient_unlearn(

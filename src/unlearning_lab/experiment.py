@@ -28,6 +28,7 @@ from .model import DigitMLP, count_parameters
 from .train import TrainingConfig, predict_logits, set_seed, train_classifier
 from .unlearn import (
     UnlearnConfig,
+    dampen_output_class,
     negative_gradient_unlearn,
     reset_output_class,
     retain_finetune,
@@ -42,6 +43,8 @@ class ExperimentConfig:
     batch_size: int = 64
     learning_rate: float = 1e-3
     unlearn_steps: int = 80
+    dampen_weight_scale: float = 0.35
+    dampen_bias_shift: float = -1.0
     hidden_dim: int = 128
     dropout: float = 0.10
     output_dir: Path = Path("artifacts")
@@ -176,6 +179,15 @@ def run_experiment(config: ExperimentConfig) -> dict:
     timings["head_reset"] = time.perf_counter() - start
 
     start = time.perf_counter()
+    models["output_dampening"] = dampen_output_class(
+        models["full_model"],
+        class_id=config.forget_class,
+        weight_scale=config.dampen_weight_scale,
+        bias_shift=config.dampen_bias_shift,
+    )
+    timings["output_dampening"] = time.perf_counter() - start
+
+    start = time.perf_counter()
     negative_model, negative_history = negative_gradient_unlearn(
         models["full_model"],
         data.train_retain,
@@ -256,6 +268,8 @@ def run_experiment(config: ExperimentConfig) -> dict:
             "model": {
                 "hidden_dim": config.hidden_dim,
                 "dropout": config.dropout,
+                "dampen_weight_scale": config.dampen_weight_scale,
+                "dampen_bias_shift": config.dampen_bias_shift,
             },
             "methods": list(models),
             "timings": timings,
@@ -312,6 +326,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size", type=int, default=ExperimentConfig.batch_size)
     parser.add_argument("--learning-rate", type=float, default=ExperimentConfig.learning_rate)
     parser.add_argument("--unlearn-steps", type=int, default=ExperimentConfig.unlearn_steps)
+    parser.add_argument("--dampen-weight-scale", type=float, default=ExperimentConfig.dampen_weight_scale)
+    parser.add_argument("--dampen-bias-shift", type=float, default=ExperimentConfig.dampen_bias_shift)
     parser.add_argument("--hidden-dim", type=int, default=ExperimentConfig.hidden_dim)
     parser.add_argument("--dropout", type=float, default=ExperimentConfig.dropout)
     parser.add_argument("--output-dir", type=Path, default=ExperimentConfig.output_dir)

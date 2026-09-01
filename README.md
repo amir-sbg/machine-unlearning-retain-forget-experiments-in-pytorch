@@ -12,6 +12,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - retain-only fine-tuning from the original model
 - negative-gradient unlearning with retain loss mixed in
 - last-layer reset for the forgotten class
+- output-head dampening as a cheap intermediate scrub baseline
 - metrics for retain accuracy, forget accuracy, forget-class confidence, and distance from exact retraining
 - membership-style forget diagnostics comparing train-forget confidence/loss against held-out forget examples
 - Jensen-Shannon probability drift against the exact retrain baseline

@@ -4,6 +4,7 @@ from unlearning_lab.data import Split
 from unlearning_lab.model import DigitMLP
 from unlearning_lab.unlearn import (
     UnlearnConfig,
+    dampen_output_class,
     negative_gradient_unlearn,
     reset_output_class,
 )
@@ -18,6 +19,21 @@ def test_reset_output_class_changes_only_requested_row() -> None:
 
     assert not torch.allclose(original[3], updated[3])
     assert torch.allclose(original[2], updated[2])
+
+
+def test_dampen_output_class_scales_requested_row() -> None:
+    model = DigitMLP(hidden_dim=32, dropout=0.0)
+    original_weight = model.net[-1].weight.detach().clone()
+    original_bias = model.net[-1].bias.detach().clone()
+
+    scrubbed = dampen_output_class(model, class_id=4, weight_scale=0.25, bias_shift=-0.5)
+    updated_weight = scrubbed.net[-1].weight.detach()
+    updated_bias = scrubbed.net[-1].bias.detach()
+
+    assert torch.allclose(updated_weight[4], original_weight[4] * 0.25)
+    assert torch.allclose(updated_weight[3], original_weight[3])
+    assert torch.isclose(updated_bias[4], original_bias[4] - 0.5)
+    assert torch.isclose(updated_bias[3], original_bias[3])
 
 
 def test_negative_gradient_unlearning_records_steps() -> None:
