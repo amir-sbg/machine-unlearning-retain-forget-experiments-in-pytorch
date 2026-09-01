@@ -57,6 +57,8 @@ class ExperimentConfig:
 def choose_device(requested: str) -> torch.device:
     if requested == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if requested == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA was requested but is not available")
     return torch.device(requested)
 
 

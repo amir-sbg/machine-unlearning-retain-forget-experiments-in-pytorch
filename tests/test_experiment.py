@@ -1,8 +1,9 @@
 import numpy as np
 import pytest
+import torch
 
 from unlearning_lab.data import Split
-from unlearning_lab.experiment import ExperimentConfig, _new_model, join_splits, select_class
+from unlearning_lab.experiment import ExperimentConfig, _new_model, choose_device, join_splits, select_class
 
 
 def test_join_splits_preserves_rows() -> None:
@@ -48,3 +49,10 @@ def test_experiment_rejects_bad_model_shape() -> None:
         _new_model(ExperimentConfig(hidden_dim=8))
     with pytest.raises(ValueError, match="dropout"):
         _new_model(ExperimentConfig(dropout=1.0))
+
+
+def test_choose_device_rejects_missing_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+    with pytest.raises(RuntimeError, match="CUDA"):
+        choose_device("cuda")
