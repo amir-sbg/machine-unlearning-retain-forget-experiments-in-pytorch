@@ -10,6 +10,8 @@ from torch import nn
 from .data import Split, UnlearningData
 from .train import predict_logits
 
+DEFAULT_CONFIDENCE_THRESHOLDS = (0.10, 0.25, 0.50, 0.75)
+
 
 def _checked_labels_logits(
     labels: np.ndarray,
@@ -121,6 +123,37 @@ def membership_signal_summary(
         "holdout_forget_nll": holdout["true_label_nll"],
         "nll_gap_holdout_minus_train": nll_gap,
         "membership_signal": float(max(0.0, confidence_gap) + max(0.0, nll_gap)),
+    }
+
+
+def forget_confidence_curve(
+    labels: np.ndarray,
+    logits: np.ndarray,
+    forget_class: int,
+    thresholds: tuple[float, ...] = DEFAULT_CONFIDENCE_THRESHOLDS,
+) -> dict[str, float | int | list[dict[str, float | int]]]:
+    labels, logits = _checked_labels_logits(labels, logits, forget_class)
+    if any(threshold < 0.0 or threshold > 1.0 for threshold in thresholds):
+        raise ValueError("thresholds must be probabilities in [0, 1]")
+
+    forget_mask = labels == forget_class
+    if not np.any(forget_mask):
+        raise ValueError("labels do not contain the forget class")
+
+    probabilities = softmax(logits)[forget_mask, forget_class]
+    rows = int(len(probabilities))
+    return {
+        "forget_rows": rows,
+        "mean_forget_confidence": float(np.mean(probabilities)),
+        "median_forget_confidence": float(np.median(probabilities)),
+        "thresholds": [
+            {
+                "threshold": float(threshold),
+                "count_at_or_above": int(np.sum(probabilities >= threshold)),
+                "fraction_at_or_above": float(np.mean(probabilities >= threshold)),
+            }
+            for threshold in sorted(thresholds)
+        ],
     }
 
 

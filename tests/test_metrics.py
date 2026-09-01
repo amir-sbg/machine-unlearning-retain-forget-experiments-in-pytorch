@@ -4,6 +4,7 @@ import pytest
 from unlearning_lab.metrics import (
     compare_to_exact_retrain,
     distribution_gap_summary,
+    forget_confidence_curve,
     membership_signal_summary,
     method_scorecard,
     pareto_frontier,
@@ -69,6 +70,29 @@ def test_membership_signal_rejects_mixed_forget_split() -> None:
             np.array([1]),
             np.zeros((1, 2)),
             forget_class=1,
+        )
+
+
+def test_forget_confidence_curve_reports_threshold_counts() -> None:
+    report = forget_confidence_curve(
+        labels=np.array([1, 1, 0]),
+        logits=np.array([[0.0, 4.0], [0.0, 0.0], [4.0, 0.0]]),
+        forget_class=1,
+        thresholds=(0.25, 0.75),
+    )
+
+    assert report["forget_rows"] == 2
+    assert report["thresholds"][0]["count_at_or_above"] == 2
+    assert report["thresholds"][1]["count_at_or_above"] == 1
+
+
+def test_forget_confidence_curve_rejects_bad_thresholds() -> None:
+    with pytest.raises(ValueError, match="thresholds"):
+        forget_confidence_curve(
+            labels=np.array([1]),
+            logits=np.array([[0.0, 1.0]]),
+            forget_class=1,
+            thresholds=(1.2,),
         )
 
 
