@@ -16,6 +16,7 @@ import torch
 
 from .data import Split, dataset_summary, load_unlearning_data
 from .metrics import (
+    classwise_accuracy,
     compare_to_exact_retrain,
     distribution_gap_summary,
     evaluate_unlearning_model,
@@ -232,6 +233,14 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
         for name, logits in test_logits.items()
     }
+    classwise_reports = {
+        name: classwise_accuracy(
+            data.test.labels,
+            logits,
+            data.forget_class,
+        )
+        for name, logits in test_logits.items()
+    }
     distribution_gaps = {
         name: distribution_gap_summary(
             data.test.labels,
@@ -265,6 +274,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(method_metrics, config.report_dir / "method_metrics.json")
     save_json(membership_signals, config.report_dir / "membership_signals.json")
     save_json(confidence_curves, config.report_dir / "forget_confidence_curves.json")
+    save_json(classwise_reports, config.report_dir / "classwise_metrics.json")
     save_json(distribution_gaps, config.report_dir / "probability_drift.json")
     save_json(retrain_gaps, config.report_dir / "retrain_gaps.json")
     save_json({"methods": scorecard}, config.report_dir / "method_scorecard.json")
@@ -325,6 +335,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "method_metrics": method_metrics,
         "membership_signals": membership_signals,
         "confidence_curves": confidence_curves,
+        "classwise_reports": classwise_reports,
         "distribution_gaps": distribution_gaps,
         "retrain_gaps": retrain_gaps,
         "scorecard": scorecard,

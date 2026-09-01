@@ -73,6 +73,31 @@ def split_metrics(
     return result
 
 
+def classwise_accuracy(
+    labels: np.ndarray,
+    logits: np.ndarray,
+    forget_class: int,
+) -> list[dict[str, float | int | bool]]:
+    labels, logits = _checked_labels_logits(labels, logits, forget_class)
+    probabilities = softmax(logits)
+    predictions = probabilities.argmax(axis=1)
+    rows = []
+    for class_id in sorted(int(value) for value in np.unique(labels)):
+        mask = labels == class_id
+        class_rows = int(np.sum(mask))
+        class_probabilities = probabilities[mask, class_id]
+        rows.append(
+            {
+                "class_id": class_id,
+                "is_forget_class": class_id == forget_class,
+                "rows": class_rows,
+                "accuracy": float(np.mean(predictions[mask] == labels[mask])),
+                "true_class_confidence": float(np.mean(class_probabilities)),
+            }
+        )
+    return rows
+
+
 def _true_label_stats(labels: np.ndarray, logits: np.ndarray) -> dict[str, float | int]:
     probabilities = np.clip(softmax(logits), 1e-12, 1.0)
     rows = np.arange(len(labels))

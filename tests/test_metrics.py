@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from unlearning_lab.metrics import (
+    classwise_accuracy,
     compare_to_exact_retrain,
     distribution_gap_summary,
     forget_confidence_curve,
@@ -44,6 +45,19 @@ def test_split_metrics_rejects_non_finite_logits() -> None:
 
     with pytest.raises(ValueError, match="finite"):
         split_metrics(np.array([0, 1]), logits, forget_class=1)
+
+
+def test_classwise_accuracy_reports_each_label() -> None:
+    rows = classwise_accuracy(
+        labels=np.array([0, 1, 1]),
+        logits=np.array([[3.0, 0.0], [0.0, 3.0], [2.0, 1.0]]),
+        forget_class=1,
+    )
+
+    assert [row["class_id"] for row in rows] == [0, 1]
+    assert rows[0]["accuracy"] == 1.0
+    assert rows[1]["accuracy"] == 0.5
+    assert rows[1]["is_forget_class"] is True
 
 
 def test_membership_signal_compares_train_and_holdout_forget_examples() -> None:
