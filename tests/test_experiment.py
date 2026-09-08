@@ -3,7 +3,14 @@ import pytest
 import torch
 
 from unlearning_lab.data import Split
-from unlearning_lab.experiment import ExperimentConfig, _new_model, choose_device, join_splits, select_class
+from unlearning_lab.experiment import (
+    ExperimentConfig,
+    _new_model,
+    _unlearn_config,
+    choose_device,
+    join_splits,
+    select_class,
+)
 
 
 def test_join_splits_preserves_rows() -> None:
@@ -42,6 +49,22 @@ def test_experiment_config_controls_model_width() -> None:
     assert sum(parameter.numel() for parameter in wide.parameters()) > sum(
         parameter.numel() for parameter in small.parameters()
     )
+
+
+def test_unlearn_config_uses_experiment_learning_rate() -> None:
+    config = _unlearn_config(
+        ExperimentConfig(
+            learning_rate=3e-4,
+            unlearn_steps=12,
+            batch_size=16,
+            seed=9,
+        )
+    )
+
+    assert config.learning_rate == 3e-4
+    assert config.steps == 12
+    assert config.batch_size == 16
+    assert config.seed == 9
 
 
 def test_experiment_rejects_bad_model_shape() -> None:

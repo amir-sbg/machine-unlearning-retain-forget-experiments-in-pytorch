@@ -86,6 +86,15 @@ def _training_config(config: ExperimentConfig, epochs: int | None = None) -> Tra
     )
 
 
+def _unlearn_config(config: ExperimentConfig) -> UnlearnConfig:
+    return UnlearnConfig(
+        steps=config.unlearn_steps,
+        batch_size=config.batch_size,
+        learning_rate=config.learning_rate,
+        seed=config.seed,
+    )
+
+
 def _new_model(config: ExperimentConfig) -> DigitMLP:
     if config.hidden_dim < 16:
         raise ValueError("hidden_dim must be at least 16")
@@ -197,11 +206,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         data.train_retain,
         data.train_forget,
         data.validation,
-        UnlearnConfig(
-            steps=config.unlearn_steps,
-            batch_size=config.batch_size,
-            seed=config.seed,
-        ),
+        _unlearn_config(config),
         device,
     )
     timings["negative_gradient"] = time.perf_counter() - start
