@@ -15,6 +15,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - output-head dampening as a cheap intermediate scrub baseline
 - metrics for retain accuracy, forget accuracy, forget-class confidence, and distance from exact retraining
 - class-wise test metrics to check collateral damage on retained classes
+- retained-class damage summaries for the weakest preserved class
 - threshold curves showing how many forget examples remain high-confidence
 - membership-style forget diagnostics comparing train-forget confidence/loss against held-out forget examples
 - Jensen-Shannon probability drift against the exact retrain baseline
@@ -48,6 +49,7 @@ python -m unlearning_lab.experiment \
 ```text
 reports/
 ├── classwise_metrics.json
+├── collateral_damage.json
 ├── data_summary.json
 ├── experiment_summary.json
 ├── forget_confidence_curves.json

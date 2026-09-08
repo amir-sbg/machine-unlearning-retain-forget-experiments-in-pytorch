@@ -9,6 +9,7 @@ from unlearning_lab.metrics import (
     membership_signal_summary,
     method_scorecard,
     pareto_frontier,
+    retained_class_damage,
     split_metrics,
 )
 
@@ -58,6 +59,39 @@ def test_classwise_accuracy_reports_each_label() -> None:
     assert rows[0]["accuracy"] == 1.0
     assert rows[1]["accuracy"] == 0.5
     assert rows[1]["is_forget_class"] is True
+
+
+def test_retained_class_damage_finds_worst_retained_class() -> None:
+    report = retained_class_damage(
+        [
+            {
+                "class_id": 0,
+                "is_forget_class": False,
+                "rows": 5,
+                "accuracy": 0.9,
+                "true_class_confidence": 0.8,
+            },
+            {
+                "class_id": 1,
+                "is_forget_class": True,
+                "rows": 5,
+                "accuracy": 0.1,
+                "true_class_confidence": 0.2,
+            },
+            {
+                "class_id": 2,
+                "is_forget_class": False,
+                "rows": 5,
+                "accuracy": 0.7,
+                "true_class_confidence": 0.6,
+            },
+        ]
+    )
+
+    assert report["retained_classes"] == 2
+    assert report["worst_retained_class"] == 2
+    assert report["worst_retained_accuracy"] == 0.7
+    assert report["mean_retained_accuracy"] == pytest.approx(0.8)
 
 
 def test_membership_signal_compares_train_and_holdout_forget_examples() -> None:

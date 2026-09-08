@@ -98,6 +98,32 @@ def classwise_accuracy(
     return rows
 
 
+def retained_class_damage(
+    classwise_rows: list[dict[str, float | int | bool]],
+) -> dict[str, float | int | None]:
+    retained = [row for row in classwise_rows if not row["is_forget_class"]]
+    if not retained:
+        return {
+            "retained_classes": 0,
+            "worst_retained_class": None,
+            "worst_retained_accuracy": None,
+            "mean_retained_accuracy": 0.0,
+            "mean_retained_confidence": 0.0,
+        }
+    worst = min(retained, key=lambda row: float(row["accuracy"]))
+    return {
+        "retained_classes": len(retained),
+        "worst_retained_class": int(worst["class_id"]),
+        "worst_retained_accuracy": float(worst["accuracy"]),
+        "mean_retained_accuracy": float(
+            np.mean([float(row["accuracy"]) for row in retained])
+        ),
+        "mean_retained_confidence": float(
+            np.mean([float(row["true_class_confidence"]) for row in retained])
+        ),
+    }
+
+
 def _true_label_stats(labels: np.ndarray, logits: np.ndarray) -> dict[str, float | int]:
     probabilities = np.clip(softmax(logits), 1e-12, 1.0)
     rows = np.arange(len(labels))

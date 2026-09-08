@@ -24,6 +24,7 @@ from .metrics import (
     membership_signal_summary,
     method_scorecard,
     pareto_frontier,
+    retained_class_damage,
     save_json,
 )
 from .model import DigitMLP, count_parameters
@@ -248,6 +249,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
         for name, logits in test_logits.items()
     }
+    collateral_damage = {
+        name: retained_class_damage(rows)
+        for name, rows in classwise_reports.items()
+    }
     distribution_gaps = {
         name: distribution_gap_summary(
             data.test.labels,
@@ -269,6 +274,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 **retrain_gaps[name],
                 **membership_signals[name],
                 **distribution_gaps[name],
+                **{
+                    f"collateral_{key}": value
+                    for key, value in collateral_damage[name].items()
+                },
             }
             for name, metrics in method_metrics.items()
         ]
@@ -282,6 +291,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(membership_signals, config.report_dir / "membership_signals.json")
     save_json(confidence_curves, config.report_dir / "forget_confidence_curves.json")
     save_json(classwise_reports, config.report_dir / "classwise_metrics.json")
+    save_json(collateral_damage, config.report_dir / "collateral_damage.json")
     save_json(distribution_gaps, config.report_dir / "probability_drift.json")
     save_json(retrain_gaps, config.report_dir / "retrain_gaps.json")
     save_json({"methods": scorecard}, config.report_dir / "method_scorecard.json")
@@ -309,6 +319,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
             "lowest_mean_forget_confidence": min(
                 confidence_curves,
                 key=lambda name: confidence_curves[name]["mean_forget_confidence"],
+            ),
+            "least_retained_class_damage": max(
+                collateral_damage,
+                key=lambda name: collateral_damage[name]["worst_retained_accuracy"] or 0.0,
             ),
             "closest_probability_profile": min(
                 distribution_gaps,
@@ -343,6 +357,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "membership_signals": membership_signals,
         "confidence_curves": confidence_curves,
         "classwise_reports": classwise_reports,
+        "collateral_damage": collateral_damage,
         "distribution_gaps": distribution_gaps,
         "retrain_gaps": retrain_gaps,
         "scorecard": scorecard,
