@@ -306,6 +306,11 @@ def method_scorecard(
             + gap["forget_confidence_gap"]
             + gap["forget_accuracy_gap"]
         )
+        tradeoff_score = float(
+            test["retain_accuracy"]
+            - 0.5 * test["forget_confidence"]
+            - 0.5 * test["forget_accuracy"]
+        )
         rows.append(
             {
                 "method": name,
@@ -319,6 +324,7 @@ def method_scorecard(
                 "forget_confidence_gap": gap["forget_confidence_gap"],
                 "forget_accuracy_gap": gap["forget_accuracy_gap"],
                 "total_retrain_gap": float(total_gap),
+                "utility_forgetting_score": tradeoff_score,
             }
         )
     return sorted(rows, key=lambda row: (row["total_retrain_gap"], row["runtime_seconds"]))

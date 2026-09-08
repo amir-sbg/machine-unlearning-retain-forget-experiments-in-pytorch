@@ -217,6 +217,9 @@ def test_method_scorecard_ranks_by_retrain_gap_and_reports_speedup() -> None:
     assert rows[1]["runtime_seconds"] == 0.2
     assert rows[1]["speedup_vs_exact_retrain"] == pytest.approx(5.0)
     assert rows[1]["total_retrain_gap"] == pytest.approx(0.35)
+    assert rows[1]["utility_forgetting_score"] == pytest.approx(
+        0.90 - 0.5 * 0.25 - 0.5 * 0.20
+    )
 
 
 def test_pareto_frontier_keeps_fast_or_low_gap_methods() -> None:

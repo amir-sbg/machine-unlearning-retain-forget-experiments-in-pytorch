@@ -20,6 +20,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - membership-style forget diagnostics comparing train-forget confidence/loss against held-out forget examples
 - Jensen-Shannon probability drift against the exact retrain baseline
 - scorecard runtime speedup against exact retraining
+- a compact utility/forgetting score for quick method comparison
 - a small notebook for reviewing the generated result table
 
 ## Run

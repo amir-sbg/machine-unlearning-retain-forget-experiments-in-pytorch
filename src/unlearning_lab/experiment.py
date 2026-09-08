@@ -311,6 +311,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
             "methods": list(models),
             "timings": timings,
             "best_method_by_retrain_gap": scorecard[0]["method"],
+            "best_method_by_utility_forgetting_score": max(
+                scorecard,
+                key=lambda row: row["utility_forgetting_score"],
+            )["method"],
             "pareto_frontier": [row["method"] for row in frontier],
             "lowest_membership_signal": min(
                 membership_signals,
