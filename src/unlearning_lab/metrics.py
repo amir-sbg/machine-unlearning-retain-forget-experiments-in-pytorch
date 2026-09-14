@@ -26,8 +26,12 @@ def _checked_labels_logits(
         raise ValueError("labels and logits must have matching rows")
     if len(labels) == 0:
         raise ValueError("labels and logits must not be empty")
+    if not np.issubdtype(labels.dtype, np.integer):
+        raise ValueError("labels must contain integer class ids")
     if not np.all(np.isfinite(logits)):
         raise ValueError("logits must contain only finite values")
+    if np.any(labels < 0) or np.any(labels >= logits.shape[1]):
+        raise ValueError("labels must be valid indices for the logits class dimension")
     if not 0 <= forget_class < logits.shape[1]:
         raise ValueError("forget_class must be inside the logits class dimension")
     return labels, logits
@@ -37,6 +41,16 @@ def softmax(logits: np.ndarray) -> np.ndarray:
     shifted = logits - logits.max(axis=1, keepdims=True)
     exp = np.exp(shifted)
     return exp / exp.sum(axis=1, keepdims=True)
+
+
+def prediction_entropy(logits: np.ndarray) -> float:
+    values = np.asarray(logits)
+    if values.ndim != 2 or values.shape[0] == 0:
+        raise ValueError("logits must be a non-empty 2-D array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("logits must contain only finite values")
+    probabilities = np.clip(softmax(values), 1e-12, 1.0)
+    return float(np.mean(-np.sum(probabilities * np.log(probabilities), axis=1)))
 
 
 def split_metrics(
@@ -55,6 +69,7 @@ def split_metrics(
         "rows": int(len(labels)),
         "accuracy": float(np.mean(predictions == labels)),
         "mean_forget_class_probability": float(np.mean(probabilities[:, forget_class])),
+        "mean_prediction_entropy": prediction_entropy(logits),
     }
     if np.any(retain_mask):
         result["retain_accuracy"] = float(np.mean(predictions[retain_mask] == labels[retain_mask]))

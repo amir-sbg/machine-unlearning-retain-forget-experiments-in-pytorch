@@ -9,6 +9,7 @@ from unlearning_lab.metrics import (
     membership_signal_summary,
     method_scorecard,
     pareto_frontier,
+    prediction_entropy,
     retained_class_damage,
     split_metrics,
 )
@@ -29,6 +30,7 @@ def test_split_metrics_reports_forget_confidence() -> None:
     assert metrics["accuracy"] == 1.0
     assert metrics["forget_rows"] == 2
     assert metrics["forget_confidence"] > 0.5
+    assert metrics["mean_prediction_entropy"] > 0
 
 
 def test_split_metrics_rejects_bad_shapes() -> None:
@@ -46,6 +48,21 @@ def test_split_metrics_rejects_non_finite_logits() -> None:
 
     with pytest.raises(ValueError, match="finite"):
         split_metrics(np.array([0, 1]), logits, forget_class=1)
+
+
+def test_metrics_reject_invalid_label_ids() -> None:
+    with pytest.raises(ValueError, match="valid indices"):
+        split_metrics(np.array([0, 2]), np.zeros((2, 2)), forget_class=1)
+
+    with pytest.raises(ValueError, match="integer"):
+        split_metrics(np.array([0.0, 1.0]), np.zeros((2, 2)), forget_class=1)
+
+
+def test_prediction_entropy_is_lower_for_confident_logits() -> None:
+    confident = prediction_entropy(np.array([[8.0, 0.0], [0.0, 8.0]]))
+    uncertain = prediction_entropy(np.zeros((2, 2)))
+
+    assert confident < uncertain
 
 
 def test_classwise_accuracy_reports_each_label() -> None:
