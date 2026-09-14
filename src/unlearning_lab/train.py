@@ -45,10 +45,21 @@ def make_loader(
     shuffle: bool,
     seed: int = 42,
 ) -> DataLoader:
+    if batch_size < 1:
+        raise ValueError("batch_size must be positive")
+    features = np.asarray(split.features)
+    labels = np.asarray(split.labels)
+    if features.ndim != 2 or labels.ndim != 1:
+        raise ValueError("split features must be 2-D and labels must be 1-D")
+    if len(features) != len(labels):
+        raise ValueError("split features and labels must have matching rows")
+    if len(labels) == 0:
+        raise ValueError("split must not be empty")
+
     generator = torch.Generator().manual_seed(seed)
     dataset = TensorDataset(
-        torch.from_numpy(split.features).float(),
-        torch.from_numpy(split.labels).long(),
+        torch.from_numpy(features).float(),
+        torch.from_numpy(labels).long(),
     )
     return DataLoader(
         dataset,

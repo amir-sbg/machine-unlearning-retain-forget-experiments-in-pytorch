@@ -1,8 +1,10 @@
+import numpy as np
+import pytest
 import torch
 
 from unlearning_lab.data import Split
 from unlearning_lab.model import DigitMLP, count_parameters
-from unlearning_lab.train import TrainingConfig, train_classifier
+from unlearning_lab.train import TrainingConfig, make_loader, train_classifier
 
 
 def test_model_outputs_digit_logits() -> None:
@@ -28,3 +30,11 @@ def test_training_loop_records_history() -> None:
 
     assert result.epochs_trained >= 1
     assert result.history[-1]["validation_loss"] >= 0
+
+
+def test_make_loader_rejects_misaligned_or_empty_splits() -> None:
+    with pytest.raises(ValueError, match="matching rows"):
+        make_loader(Split(np.zeros((2, 3)), np.zeros(1)), 2, shuffle=False)
+
+    with pytest.raises(ValueError, match="empty"):
+        make_loader(Split(np.zeros((0, 3)), np.zeros(0)), 2, shuffle=False)
