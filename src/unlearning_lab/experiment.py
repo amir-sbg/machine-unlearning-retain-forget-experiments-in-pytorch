@@ -19,6 +19,7 @@ from .metrics import (
     classwise_accuracy,
     compare_to_exact_retrain,
     distribution_gap_summary,
+    expected_calibration_error,
     evaluate_unlearning_model,
     forget_confidence_curve,
     membership_signal_summary,
@@ -262,6 +263,14 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
         for name, logits in test_logits.items()
     }
+    calibration_reports = {
+        name: expected_calibration_error(
+            data.test.labels,
+            logits,
+            data.forget_class,
+        )
+        for name, logits in test_logits.items()
+    }
     retrain_gaps = compare_to_exact_retrain(method_metrics)
     scorecard = method_scorecard(method_metrics, timings)
     frontier = pareto_frontier(scorecard)
@@ -274,6 +283,9 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 **retrain_gaps[name],
                 **membership_signals[name],
                 **distribution_gaps[name],
+                "calibration_ece": calibration_reports[name]["ece"],
+                "calibration_brier": calibration_reports[name]["brier"],
+                "calibration_overconfidence": calibration_reports[name]["overconfidence"],
                 **{
                     f"collateral_{key}": value
                     for key, value in collateral_damage[name].items()
@@ -293,6 +305,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(classwise_reports, config.report_dir / "classwise_metrics.json")
     save_json(collateral_damage, config.report_dir / "collateral_damage.json")
     save_json(distribution_gaps, config.report_dir / "probability_drift.json")
+    save_json(calibration_reports, config.report_dir / "calibration_reports.json")
     save_json(retrain_gaps, config.report_dir / "retrain_gaps.json")
     save_json({"methods": scorecard}, config.report_dir / "method_scorecard.json")
     save_json({"methods": frontier}, config.report_dir / "method_frontier.json")
@@ -331,6 +344,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
             "closest_probability_profile": min(
                 distribution_gaps,
                 key=lambda name: distribution_gaps[name]["mean_js_divergence_to_retrain"],
+            ),
+            "best_calibrated_method": min(
+                calibration_reports,
+                key=lambda name: calibration_reports[name]["ece"],
             ),
         },
         config.report_dir / "experiment_summary.json",

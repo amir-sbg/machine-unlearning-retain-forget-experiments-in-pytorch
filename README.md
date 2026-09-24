@@ -19,6 +19,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - threshold curves showing how many forget examples remain high-confidence
 - membership-style forget diagnostics comparing train-forget confidence/loss against held-out forget examples
 - Jensen-Shannon probability drift against the exact retrain baseline
+- calibration error and Brier score for checking confidence after unlearning
 - scorecard runtime speedup against exact retraining
 - a compact utility/forgetting score for quick method comparison
 - a small notebook for reviewing the generated result table
@@ -50,6 +51,7 @@ python -m unlearning_lab.experiment \
 ```text
 reports/
 ├── classwise_metrics.json
+├── calibration_reports.json
 ├── collateral_damage.json
 ├── data_summary.json
 ├── experiment_summary.json
