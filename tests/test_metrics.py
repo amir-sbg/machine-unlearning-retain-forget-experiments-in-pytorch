@@ -5,6 +5,7 @@ from unlearning_lab.metrics import (
     classwise_accuracy,
     compare_to_exact_retrain,
     distribution_gap_summary,
+    expected_calibration_error,
     forget_confidence_curve,
     membership_signal_summary,
     method_scorecard,
@@ -63,6 +64,27 @@ def test_prediction_entropy_is_lower_for_confident_logits() -> None:
     uncertain = prediction_entropy(np.zeros((2, 2)))
 
     assert confident < uncertain
+
+
+def test_expected_calibration_error_reports_confidence_gap() -> None:
+    report = expected_calibration_error(
+        labels=np.array([0, 1, 1, 0]),
+        logits=np.array(
+            [
+                [3.0, 0.0],
+                [0.0, 3.0],
+                [2.0, 0.0],
+                [0.8, 0.6],
+            ]
+        ),
+        forget_class=1,
+        bins=2,
+    )
+
+    assert report["ece"] >= 0.0
+    assert report["brier"] >= 0.0
+    assert len(report["bins"]) == 2
+    assert sum(row["count"] for row in report["bins"]) == 4
 
 
 def test_classwise_accuracy_reports_each_label() -> None:

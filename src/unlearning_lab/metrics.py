@@ -53,6 +53,64 @@ def prediction_entropy(logits: np.ndarray) -> float:
     return float(np.mean(-np.sum(probabilities * np.log(probabilities), axis=1)))
 
 
+def expected_calibration_error(
+    labels: np.ndarray,
+    logits: np.ndarray,
+    forget_class: int,
+    bins: int = 10,
+) -> dict[str, float | list[dict[str, float | int]]]:
+    labels, logits = _checked_labels_logits(labels, logits, forget_class)
+    if bins < 1:
+        raise ValueError("bins must be positive")
+
+    probabilities = softmax(logits)
+    confidences = probabilities.max(axis=1)
+    predictions = probabilities.argmax(axis=1)
+    correct = predictions == labels
+    rows = []
+    ece = 0.0
+    for index in range(bins):
+        lower = index / bins
+        upper = (index + 1) / bins
+        mask = (confidences >= lower) & (
+            confidences < upper if index < bins - 1 else confidences <= upper
+        )
+        count = int(np.sum(mask))
+        if count == 0:
+            rows.append(
+                {
+                    "bin": index,
+                    "count": 0,
+                    "avg_confidence": 0.0,
+                    "accuracy": 0.0,
+                    "gap": 0.0,
+                }
+            )
+            continue
+        avg_confidence = float(np.mean(confidences[mask]))
+        accuracy = float(np.mean(correct[mask]))
+        gap = abs(avg_confidence - accuracy)
+        ece += count / len(labels) * gap
+        rows.append(
+            {
+                "bin": index,
+                "count": count,
+                "avg_confidence": avg_confidence,
+                "accuracy": accuracy,
+                "gap": float(gap),
+            }
+        )
+    brier = float(np.mean((confidences - correct.astype(float)) ** 2))
+    return {
+        "ece": float(ece),
+        "brier": brier,
+        "mean_confidence": float(np.mean(confidences)),
+        "accuracy": float(np.mean(correct)),
+        "overconfidence": float(np.mean(confidences) - np.mean(correct)),
+        "bins": rows,
+    }
+
+
 def split_metrics(
     labels: np.ndarray,
     logits: np.ndarray,
