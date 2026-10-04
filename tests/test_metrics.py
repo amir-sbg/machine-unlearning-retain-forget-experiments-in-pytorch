@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import torch
 
 from unlearning_lab.metrics import (
     classwise_accuracy,
@@ -10,11 +11,13 @@ from unlearning_lab.metrics import (
     membership_signal_summary,
     membership_attack_auc,
     method_scorecard,
+    parameter_distance_summary,
     pareto_frontier,
     prediction_entropy,
     retained_class_damage,
     split_metrics,
 )
+from unlearning_lab.model import DigitMLP
 
 
 def test_split_metrics_reports_forget_confidence() -> None:
@@ -213,6 +216,21 @@ def test_distribution_gap_rejects_shape_mismatch() -> None:
             np.zeros((2, 3)),
             forget_class=1,
         )
+
+
+def test_parameter_distance_is_zero_for_matching_models() -> None:
+    reference = DigitMLP(hidden_dim=32, dropout=0.0)
+    candidate = DigitMLP(hidden_dim=32, dropout=0.0)
+    candidate.load_state_dict(reference.state_dict())
+
+    exact = parameter_distance_summary(reference, candidate)
+    with torch.no_grad():
+        next(candidate.parameters()).add_(0.1)
+    shifted = parameter_distance_summary(reference, candidate)
+
+    assert exact["l2_distance_to_retrain"] == 0.0
+    assert exact["cosine_similarity_to_retrain"] == pytest.approx(1.0)
+    assert shifted["relative_l2_distance_to_retrain"] > 0.0
 
 
 def test_compare_to_exact_retrain_returns_gaps() -> None:

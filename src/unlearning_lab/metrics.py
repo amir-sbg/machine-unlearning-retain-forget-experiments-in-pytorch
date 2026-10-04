@@ -339,6 +339,42 @@ def distribution_gap_summary(
     }
 
 
+def parameter_distance_summary(
+    reference_model: nn.Module,
+    candidate_model: nn.Module,
+) -> dict[str, float | int]:
+    reference = dict(reference_model.named_parameters())
+    candidate = dict(candidate_model.named_parameters())
+    if reference.keys() != candidate.keys():
+        raise ValueError("models must expose the same parameter names")
+    reference_parts = []
+    candidate_parts = []
+    for name in reference:
+        if reference[name].shape != candidate[name].shape:
+            raise ValueError(f"parameter shape mismatch for {name}")
+        reference_parts.append(reference[name].detach().double().cpu().reshape(-1))
+        candidate_parts.append(candidate[name].detach().double().cpu().reshape(-1))
+    if not reference_parts:
+        raise ValueError("models must contain trainable parameters")
+
+    reference_vector = torch.cat(reference_parts)
+    candidate_vector = torch.cat(candidate_parts)
+    difference = candidate_vector - reference_vector
+    reference_norm = float(torch.linalg.vector_norm(reference_vector))
+    candidate_norm = float(torch.linalg.vector_norm(candidate_vector))
+    distance = float(torch.linalg.vector_norm(difference))
+    denominator = max(reference_norm * candidate_norm, 1e-12)
+    cosine = float(torch.dot(reference_vector, candidate_vector) / denominator)
+    return {
+        "parameters": int(reference_vector.numel()),
+        "l2_distance_to_retrain": distance,
+        "relative_l2_distance_to_retrain": distance / max(reference_norm, 1e-12),
+        "cosine_similarity_to_retrain": cosine,
+        "mean_absolute_parameter_shift": float(torch.mean(torch.abs(difference))),
+        "max_absolute_parameter_shift": float(torch.max(torch.abs(difference))),
+    }
+
+
 def evaluate_model(
     model: nn.Module,
     split: Split,

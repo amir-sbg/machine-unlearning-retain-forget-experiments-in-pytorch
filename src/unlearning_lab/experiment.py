@@ -24,6 +24,7 @@ from .metrics import (
     forget_confidence_curve,
     membership_signal_summary,
     method_scorecard,
+    parameter_distance_summary,
     pareto_frontier,
     retained_class_damage,
     save_json,
@@ -263,6 +264,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
         for name, logits in test_logits.items()
     }
+    parameter_distances = {
+        name: parameter_distance_summary(models["exact_retrain"], model)
+        for name, model in models.items()
+    }
     calibration_reports = {
         name: expected_calibration_error(
             data.test.labels,
@@ -283,6 +288,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 **retrain_gaps[name],
                 **membership_signals[name],
                 **distribution_gaps[name],
+                **parameter_distances[name],
                 "calibration_ece": calibration_reports[name]["ece"],
                 "calibration_brier": calibration_reports[name]["brier"],
                 "calibration_overconfidence": calibration_reports[name]["overconfidence"],
@@ -305,6 +311,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(classwise_reports, config.report_dir / "classwise_metrics.json")
     save_json(collateral_damage, config.report_dir / "collateral_damage.json")
     save_json(distribution_gaps, config.report_dir / "probability_drift.json")
+    save_json(parameter_distances, config.report_dir / "parameter_distance.json")
     save_json(calibration_reports, config.report_dir / "calibration_reports.json")
     save_json(retrain_gaps, config.report_dir / "retrain_gaps.json")
     save_json({"methods": scorecard}, config.report_dir / "method_scorecard.json")
@@ -345,6 +352,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 distribution_gaps,
                 key=lambda name: distribution_gaps[name]["mean_js_divergence_to_retrain"],
             ),
+            "closest_parameter_profile": min(
+                parameter_distances,
+                key=lambda name: parameter_distances[name]["relative_l2_distance_to_retrain"],
+            ),
             "best_calibrated_method": min(
                 calibration_reports,
                 key=lambda name: calibration_reports[name]["ece"],
@@ -380,6 +391,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "classwise_reports": classwise_reports,
         "collateral_damage": collateral_damage,
         "distribution_gaps": distribution_gaps,
+        "parameter_distances": parameter_distances,
         "retrain_gaps": retrain_gaps,
         "scorecard": scorecard,
         "pareto_frontier": frontier,
