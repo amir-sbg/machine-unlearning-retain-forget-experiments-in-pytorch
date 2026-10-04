@@ -28,6 +28,7 @@ from .metrics import (
     pareto_frontier,
     retained_class_damage,
     save_json,
+    unlearning_progress_summary,
 )
 from .model import DigitMLP, count_parameters
 from .train import TrainingConfig, predict_logits, set_seed, train_classifier
@@ -277,6 +278,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         for name, logits in test_logits.items()
     }
     retrain_gaps = compare_to_exact_retrain(method_metrics)
+    progress_reports = unlearning_progress_summary(method_metrics)
     scorecard = method_scorecard(method_metrics, timings)
     frontier = pareto_frontier(scorecard)
     metrics_frame = pd.DataFrame(
@@ -286,6 +288,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 "runtime_seconds": timings.get(name, 0.0),
                 **_flatten_metrics(metrics),
                 **retrain_gaps[name],
+                **progress_reports[name],
                 **membership_signals[name],
                 **distribution_gaps[name],
                 **parameter_distances[name],
@@ -314,6 +317,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(parameter_distances, config.report_dir / "parameter_distance.json")
     save_json(calibration_reports, config.report_dir / "calibration_reports.json")
     save_json(retrain_gaps, config.report_dir / "retrain_gaps.json")
+    save_json(progress_reports, config.report_dir / "unlearning_progress.json")
     save_json({"methods": scorecard}, config.report_dir / "method_scorecard.json")
     save_json({"methods": frontier}, config.report_dir / "method_frontier.json")
     save_json(dataset_summary(data), config.report_dir / "data_summary.json")
@@ -335,6 +339,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 scorecard,
                 key=lambda row: row["utility_forgetting_score"],
             )["method"],
+            "best_method_by_balanced_progress": max(
+                progress_reports,
+                key=lambda name: progress_reports[name]["balanced_unlearning_score"],
+            ),
             "pareto_frontier": [row["method"] for row in frontier],
             "lowest_membership_signal": min(
                 membership_signals,
@@ -393,6 +401,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "distribution_gaps": distribution_gaps,
         "parameter_distances": parameter_distances,
         "retrain_gaps": retrain_gaps,
+        "progress_reports": progress_reports,
         "scorecard": scorecard,
         "pareto_frontier": frontier,
         "summary_path": str(config.report_dir / "experiment_summary.json"),

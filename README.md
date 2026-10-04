@@ -23,6 +23,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - calibration error and Brier score for checking confidence after unlearning
 - scorecard runtime speedup against exact retraining
 - a compact utility/forgetting score for quick method comparison
+- normalized forgetting progress with retained-utility and balanced-progress scores
 - a small notebook for reviewing the generated result table
 
 ## Run
@@ -64,6 +65,7 @@ reports/
 ├── probability_drift.json
 ├── parameter_distance.json
 ├── retrain_gaps.json
+├── unlearning_progress.json
 ├── unlearning_tradeoff.png
 └── *_history.csv
 

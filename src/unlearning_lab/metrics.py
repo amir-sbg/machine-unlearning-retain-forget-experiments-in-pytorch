@@ -415,6 +415,41 @@ def compare_to_exact_retrain(
     return rows
 
 
+def unlearning_progress_summary(
+    method_metrics: dict[str, dict],
+    original_key: str = "full_model",
+    exact_key: str = "exact_retrain",
+) -> dict[str, dict[str, float]]:
+    if original_key not in method_metrics or exact_key not in method_metrics:
+        raise ValueError("method metrics must include original and exact retrain references")
+    original = method_metrics[original_key]["test"]
+    exact = method_metrics[exact_key]["test"]
+    original_confidence = float(original["forget_confidence"])
+    exact_confidence = float(exact["forget_confidence"])
+    confidence_range = original_confidence - exact_confidence
+    exact_retain = float(exact["retain_accuracy"])
+
+    report = {}
+    for name, metrics in method_metrics.items():
+        test = metrics["test"]
+        candidate_confidence = float(test["forget_confidence"])
+        raw_progress = (
+            (original_confidence - candidate_confidence) / confidence_range
+            if abs(confidence_range) > 1e-12
+            else 0.0
+        )
+        clipped_progress = float(np.clip(raw_progress, 0.0, 1.0))
+        retain_ratio = float(test["retain_accuracy"]) / max(exact_retain, 1e-12)
+        report[name] = {
+            "forgetting_progress": float(raw_progress),
+            "forgetting_progress_clipped": clipped_progress,
+            "retain_utility_ratio_vs_retrain": retain_ratio,
+            "retain_accuracy_delta_vs_retrain": float(test["retain_accuracy"] - exact_retain),
+            "balanced_unlearning_score": clipped_progress * min(retain_ratio, 1.0),
+        }
+    return report
+
+
 def method_scorecard(
     method_metrics: dict[str, dict],
     timings: dict[str, float] | None = None,

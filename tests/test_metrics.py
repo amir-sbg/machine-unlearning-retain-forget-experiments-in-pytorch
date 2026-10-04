@@ -16,6 +16,7 @@ from unlearning_lab.metrics import (
     prediction_entropy,
     retained_class_damage,
     split_metrics,
+    unlearning_progress_summary,
 )
 from unlearning_lab.model import DigitMLP
 
@@ -255,6 +256,21 @@ def test_compare_to_exact_retrain_returns_gaps() -> None:
 
     assert gaps["cheap_method"]["retain_accuracy_gap"] == pytest.approx(0.05)
     assert gaps["cheap_method"]["forget_confidence_gap"] == pytest.approx(0.15)
+
+
+def test_unlearning_progress_normalizes_original_and_retrain_endpoints() -> None:
+    metrics = {
+        "full_model": {"test": {"retain_accuracy": 0.96, "forget_confidence": 0.90}},
+        "exact_retrain": {"test": {"retain_accuracy": 0.95, "forget_confidence": 0.10}},
+        "halfway": {"test": {"retain_accuracy": 0.94, "forget_confidence": 0.50}},
+    }
+
+    report = unlearning_progress_summary(metrics)
+
+    assert report["full_model"]["forgetting_progress"] == pytest.approx(0.0)
+    assert report["exact_retrain"]["forgetting_progress"] == pytest.approx(1.0)
+    assert report["halfway"]["forgetting_progress"] == pytest.approx(0.5)
+    assert report["halfway"]["balanced_unlearning_score"] < 0.5
 
 
 def test_method_scorecard_ranks_by_retrain_gap_and_reports_speedup() -> None:
