@@ -209,6 +209,19 @@ def _true_label_stats(labels: np.ndarray, logits: np.ndarray) -> dict[str, float
     }
 
 
+def membership_attack_auc(member_scores: np.ndarray, nonmember_scores: np.ndarray) -> float:
+    members = np.asarray(member_scores, dtype=float).reshape(-1)
+    nonmembers = np.asarray(nonmember_scores, dtype=float).reshape(-1)
+    if members.size == 0 or nonmembers.size == 0:
+        raise ValueError("member and nonmember scores must not be empty")
+    if not np.all(np.isfinite(members)) or not np.all(np.isfinite(nonmembers)):
+        raise ValueError("membership scores must be finite")
+    comparisons = members[:, None] - nonmembers[None, :]
+    wins = np.sum(comparisons > 0.0)
+    ties = np.sum(comparisons == 0.0)
+    return float((wins + 0.5 * ties) / comparisons.size)
+
+
 def membership_signal_summary(
     train_forget_labels: np.ndarray,
     train_forget_logits: np.ndarray,
@@ -233,6 +246,8 @@ def membership_signal_summary(
 
     train = _true_label_stats(train_labels, train_logits)
     holdout = _true_label_stats(holdout_labels, holdout_logits)
+    train_probabilities = softmax(train_logits)[np.arange(len(train_labels)), train_labels]
+    holdout_probabilities = softmax(holdout_logits)[np.arange(len(holdout_labels)), holdout_labels]
     confidence_gap = float(
         train["true_label_confidence"] - holdout["true_label_confidence"]
     )
@@ -247,6 +262,10 @@ def membership_signal_summary(
         "holdout_forget_nll": holdout["true_label_nll"],
         "nll_gap_holdout_minus_train": nll_gap,
         "membership_signal": float(max(0.0, confidence_gap) + max(0.0, nll_gap)),
+        "confidence_attack_auc": membership_attack_auc(
+            train_probabilities,
+            holdout_probabilities,
+        ),
     }
 
 

@@ -8,6 +8,7 @@ from unlearning_lab.metrics import (
     expected_calibration_error,
     forget_confidence_curve,
     membership_signal_summary,
+    membership_attack_auc,
     method_scorecard,
     pareto_frontier,
     prediction_entropy,
@@ -147,6 +148,12 @@ def test_membership_signal_compares_train_and_holdout_forget_examples() -> None:
     assert report["confidence_gap_train_minus_holdout"] > 0
     assert report["nll_gap_holdout_minus_train"] > 0
     assert report["membership_signal"] > 0
+    assert report["confidence_attack_auc"] > 0.5
+
+
+def test_membership_attack_auc_handles_ties() -> None:
+    assert membership_attack_auc(np.array([0.9, 0.8]), np.array([0.2, 0.3])) == 1.0
+    assert membership_attack_auc(np.array([0.5]), np.array([0.5])) == 0.5
 
 
 def test_membership_signal_rejects_mixed_forget_split() -> None:
