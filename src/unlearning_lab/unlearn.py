@@ -93,6 +93,81 @@ def dampen_output_class(
     return dampened
 
 
+def gradient_conflict_summary(
+    model: nn.Module,
+    retain_split: Split,
+    forget_split: Split,
+    *,
+    batch_size: int,
+    device: torch.device,
+    seed: int = 42,
+) -> dict[str, float]:
+    if batch_size < 1:
+        raise ValueError("batch_size must be positive")
+
+    was_training = model.training
+    model.to(device)
+    model.eval()
+    parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
+    if not parameters:
+        raise ValueError("model must contain trainable parameters")
+
+    retain_gradient, retain_loss = _batch_gradient(
+        model,
+        retain_split,
+        parameters,
+        batch_size=batch_size,
+        device=device,
+        seed=seed,
+    )
+    forget_gradient, forget_loss = _batch_gradient(
+        model,
+        forget_split,
+        parameters,
+        batch_size=batch_size,
+        device=device,
+        seed=seed + 1,
+    )
+    if was_training:
+        model.train()
+
+    retain_norm = torch.linalg.vector_norm(retain_gradient)
+    forget_norm = torch.linalg.vector_norm(forget_gradient)
+    denominator = (retain_norm * forget_norm).clamp_min(1e-12)
+    cosine = torch.dot(retain_gradient, forget_gradient) / denominator
+    return {
+        "retain_loss": retain_loss,
+        "forget_loss": forget_loss,
+        "retain_gradient_norm": float(retain_norm),
+        "forget_gradient_norm": float(forget_norm),
+        "gradient_cosine_similarity": float(cosine),
+        "gradient_conflict": float(torch.clamp(-cosine, min=0.0)),
+    }
+
+
+def _batch_gradient(
+    model: nn.Module,
+    split: Split,
+    parameters: list[nn.Parameter],
+    *,
+    batch_size: int,
+    device: torch.device,
+    seed: int,
+) -> tuple[torch.Tensor, float]:
+    features, labels = next(iter(make_loader(split, batch_size, shuffle=False, seed=seed)))
+    loss = nn.functional.cross_entropy(model(features.to(device)), labels.to(device))
+    gradients = torch.autograd.grad(loss, parameters, allow_unused=True)
+    flattened = torch.cat(
+        [
+            torch.zeros_like(parameter).reshape(-1)
+            if gradient is None
+            else gradient.detach().reshape(-1)
+            for parameter, gradient in zip(parameters, gradients)
+        ]
+    )
+    return flattened, float(loss.detach())
+
+
 def negative_gradient_unlearn(
     model: nn.Module,
     retain_split: Split,

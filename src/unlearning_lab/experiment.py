@@ -35,6 +35,7 @@ from .train import TrainingConfig, predict_logits, set_seed, train_classifier
 from .unlearn import (
     UnlearnConfig,
     dampen_output_class,
+    gradient_conflict_summary,
     negative_gradient_unlearn,
     reset_output_class,
     retain_finetune,
@@ -277,6 +278,17 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
         for name, logits in test_logits.items()
     }
+    gradient_conflicts = {
+        name: gradient_conflict_summary(
+            model,
+            data.train_retain,
+            data.train_forget,
+            batch_size=config.batch_size,
+            device=device,
+            seed=config.seed,
+        )
+        for name, model in models.items()
+    }
     retrain_gaps = compare_to_exact_retrain(method_metrics)
     progress_reports = unlearning_progress_summary(method_metrics)
     scorecard = method_scorecard(method_metrics, timings)
@@ -295,6 +307,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 "calibration_ece": calibration_reports[name]["ece"],
                 "calibration_brier": calibration_reports[name]["brier"],
                 "calibration_overconfidence": calibration_reports[name]["overconfidence"],
+                **gradient_conflicts[name],
                 **{
                     f"collateral_{key}": value
                     for key, value in collateral_damage[name].items()
@@ -316,6 +329,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(distribution_gaps, config.report_dir / "probability_drift.json")
     save_json(parameter_distances, config.report_dir / "parameter_distance.json")
     save_json(calibration_reports, config.report_dir / "calibration_reports.json")
+    save_json(gradient_conflicts, config.report_dir / "gradient_conflicts.json")
     save_json(retrain_gaps, config.report_dir / "retrain_gaps.json")
     save_json(progress_reports, config.report_dir / "unlearning_progress.json")
     save_json({"methods": scorecard}, config.report_dir / "method_scorecard.json")
@@ -368,6 +382,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 calibration_reports,
                 key=lambda name: calibration_reports[name]["ece"],
             ),
+            "lowest_retain_forget_gradient_conflict": min(
+                gradient_conflicts,
+                key=lambda name: gradient_conflicts[name]["gradient_conflict"],
+            ),
         },
         config.report_dir / "experiment_summary.json",
     )
@@ -400,6 +418,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "collateral_damage": collateral_damage,
         "distribution_gaps": distribution_gaps,
         "parameter_distances": parameter_distances,
+        "gradient_conflicts": gradient_conflicts,
         "retrain_gaps": retrain_gaps,
         "progress_reports": progress_reports,
         "scorecard": scorecard,

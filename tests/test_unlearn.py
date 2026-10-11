@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from unlearning_lab.data import Split
@@ -5,6 +6,7 @@ from unlearning_lab.model import DigitMLP
 from unlearning_lab.unlearn import (
     UnlearnConfig,
     dampen_output_class,
+    gradient_conflict_summary,
     negative_gradient_unlearn,
     reset_output_class,
 )
@@ -54,3 +56,23 @@ def test_negative_gradient_unlearning_records_steps() -> None:
 
     assert isinstance(model, DigitMLP)
     assert history[-1]["step"] == 2.0
+
+
+def test_gradient_conflict_summary_is_finite_and_non_destructive() -> None:
+    features = torch.eye(12, 64).numpy().astype("float32")
+    labels = (torch.arange(12) % 3).numpy()
+    split = Split(features, labels)
+    model = DigitMLP(hidden_dim=32, dropout=0.0)
+    before = {name: value.detach().clone() for name, value in model.state_dict().items()}
+
+    report = gradient_conflict_summary(
+        model,
+        split,
+        split,
+        batch_size=12,
+        device=torch.device("cpu"),
+    )
+
+    assert report["gradient_cosine_similarity"] == pytest.approx(1.0, abs=1e-6)
+    assert report["gradient_conflict"] == pytest.approx(0.0)
+    assert all(torch.equal(before[name], value) for name, value in model.state_dict().items())
