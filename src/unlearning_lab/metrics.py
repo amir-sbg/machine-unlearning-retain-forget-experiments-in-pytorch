@@ -300,6 +300,38 @@ def forget_confidence_curve(
     }
 
 
+def forget_prediction_uniformity(
+    labels: np.ndarray,
+    logits: np.ndarray,
+    forget_class: int,
+) -> dict[str, float | int]:
+    labels, logits = _checked_labels_logits(labels, logits, forget_class)
+    forget_mask = labels == forget_class
+    if not np.any(forget_mask):
+        raise ValueError("labels do not contain the forget class")
+
+    probabilities = np.clip(softmax(logits[forget_mask]), 1e-12, 1.0)
+    class_count = probabilities.shape[1]
+    uniform_probability = 1.0 / class_count
+    entropy = -np.sum(probabilities * np.log(probabilities), axis=1)
+    maximum_entropy = np.log(class_count)
+    kl_to_uniform = maximum_entropy - entropy
+    total_variation = 0.5 * np.sum(
+        np.abs(probabilities - uniform_probability),
+        axis=1,
+    )
+    forget_probability = probabilities[:, forget_class]
+    return {
+        "forget_rows": int(np.sum(forget_mask)),
+        "normalized_forget_entropy": float(np.mean(entropy / maximum_entropy)),
+        "mean_kl_to_uniform": float(np.mean(kl_to_uniform)),
+        "mean_total_variation_to_uniform": float(np.mean(total_variation)),
+        "forget_probability_minus_uniform": float(
+            np.mean(forget_probability) - uniform_probability
+        ),
+    }
+
+
 def _mean_or_zero(values: np.ndarray) -> float:
     if values.size == 0:
         return 0.0

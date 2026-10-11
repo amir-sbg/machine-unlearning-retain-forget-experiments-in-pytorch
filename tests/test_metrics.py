@@ -8,6 +8,7 @@ from unlearning_lab.metrics import (
     distribution_gap_summary,
     expected_calibration_error,
     forget_confidence_curve,
+    forget_prediction_uniformity,
     membership_signal_summary,
     membership_attack_auc,
     method_scorecard,
@@ -192,6 +193,21 @@ def test_forget_confidence_curve_rejects_bad_thresholds() -> None:
             forget_class=1,
             thresholds=(1.2,),
         )
+
+
+def test_forget_uniformity_distinguishes_flat_and_confident_predictions() -> None:
+    labels = np.array([1, 1])
+    uniform = forget_prediction_uniformity(labels, np.zeros((2, 3)), forget_class=1)
+    confident = forget_prediction_uniformity(
+        labels,
+        np.array([[0.0, 8.0, 0.0], [0.0, 8.0, 0.0]]),
+        forget_class=1,
+    )
+
+    assert uniform["normalized_forget_entropy"] == pytest.approx(1.0)
+    assert uniform["mean_kl_to_uniform"] == pytest.approx(0.0)
+    assert confident["normalized_forget_entropy"] < uniform["normalized_forget_entropy"]
+    assert confident["mean_total_variation_to_uniform"] > 0.5
 
 
 def test_distribution_gap_compares_probability_profiles() -> None:

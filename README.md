@@ -22,6 +22,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - parameter-space distance and cosine similarity to the exact retrain reference
 - calibration error and Brier score for checking confidence after unlearning
 - retain/forget gradient alignment for diagnosing destructive objective conflict
+- entropy, KL-to-uniform, and total-variation checks on forgotten examples
 - scorecard runtime speedup against exact retraining
 - a compact utility/forgetting score for quick method comparison
 - normalized forgetting progress with retained-utility and balanced-progress scores
