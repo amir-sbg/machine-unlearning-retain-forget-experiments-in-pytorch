@@ -433,6 +433,60 @@ def parameter_distance_summary(
     }
 
 
+def representation_similarity_summary(
+    reference_model: nn.Module,
+    candidate_model: nn.Module,
+    split: Split,
+    device: torch.device,
+) -> dict[str, float | int]:
+    """Compare penultimate features with linear CKA and row-wise cosine similarity."""
+
+    if len(split.features) < 2:
+        raise ValueError("representation comparison needs at least two examples")
+    if not hasattr(reference_model, "encode") or not hasattr(candidate_model, "encode"):
+        raise ValueError("models must expose an encode method")
+    features = torch.as_tensor(split.features, dtype=torch.float32, device=device)
+    reference_model.eval()
+    candidate_model.eval()
+    with torch.inference_mode():
+        reference = reference_model.encode(features).detach().double().cpu().numpy()
+        candidate = candidate_model.encode(features).detach().double().cpu().numpy()
+    if reference.shape != candidate.shape:
+        raise ValueError("model representations must have matching shapes")
+
+    reference_centered = reference - reference.mean(axis=0, keepdims=True)
+    candidate_centered = candidate - candidate.mean(axis=0, keepdims=True)
+    cross_covariance = reference_centered.T @ candidate_centered
+    reference_covariance = reference_centered.T @ reference_centered
+    candidate_covariance = candidate_centered.T @ candidate_centered
+    denominator = np.linalg.norm(reference_covariance) * np.linalg.norm(
+        candidate_covariance
+    )
+    linear_cka = (
+        float(np.linalg.norm(cross_covariance) ** 2 / denominator)
+        if denominator > 0.0
+        else 1.0
+    )
+    row_denominator = np.linalg.norm(reference, axis=1) * np.linalg.norm(
+        candidate,
+        axis=1,
+    )
+    valid = row_denominator > 0.0
+    row_cosine = np.ones(len(reference), dtype=float)
+    row_cosine[valid] = np.sum(reference[valid] * candidate[valid], axis=1) / row_denominator[valid]
+    drift = np.linalg.norm(candidate - reference, axis=1)
+    reference_norm = np.linalg.norm(reference, axis=1)
+    return {
+        "rows": int(len(reference)),
+        "representation_dim": int(reference.shape[1]),
+        "linear_cka": linear_cka,
+        "mean_row_cosine_similarity": float(np.mean(row_cosine)),
+        "mean_relative_representation_drift": float(
+            np.mean(drift / np.maximum(reference_norm, 1e-12))
+        ),
+    }
+
+
 def evaluate_model(
     model: nn.Module,
     split: Split,

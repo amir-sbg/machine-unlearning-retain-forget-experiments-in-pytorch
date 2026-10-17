@@ -14,6 +14,7 @@ from unlearning_lab.metrics import (
     membership_attack_auc,
     method_scorecard,
     parameter_distance_summary,
+    representation_similarity_summary,
     pareto_frontier,
     prediction_entropy,
     retained_class_damage,
@@ -21,6 +22,7 @@ from unlearning_lab.metrics import (
     unlearning_progress_summary,
 )
 from unlearning_lab.model import DigitMLP
+from unlearning_lab.data import Split
 
 
 def test_split_metrics_reports_forget_confidence() -> None:
@@ -267,6 +269,30 @@ def test_parameter_distance_is_zero_for_matching_models() -> None:
     assert exact["l2_distance_to_retrain"] == 0.0
     assert exact["cosine_similarity_to_retrain"] == pytest.approx(1.0)
     assert shifted["relative_l2_distance_to_retrain"] > 0.0
+
+
+def test_representation_similarity_detects_hidden_feature_drift() -> None:
+    reference = DigitMLP(hidden_dim=32, dropout=0.0)
+    candidate = DigitMLP(hidden_dim=32, dropout=0.0)
+    candidate.load_state_dict(reference.state_dict())
+    split = Split(
+        features=np.random.default_rng(4).normal(size=(12, 64)).astype(np.float32),
+        labels=np.arange(12) % 10,
+    )
+
+    exact = representation_similarity_summary(
+        reference, candidate, split, torch.device("cpu")
+    )
+    with torch.no_grad():
+        candidate.net[0].weight.add_(0.2)
+    shifted = representation_similarity_summary(
+        reference, candidate, split, torch.device("cpu")
+    )
+
+    assert exact["linear_cka"] == pytest.approx(1.0)
+    assert exact["mean_relative_representation_drift"] == pytest.approx(0.0)
+    assert shifted["linear_cka"] < 1.0
+    assert shifted["mean_relative_representation_drift"] > 0.0
 
 
 def test_compare_to_exact_retrain_returns_gaps() -> None:

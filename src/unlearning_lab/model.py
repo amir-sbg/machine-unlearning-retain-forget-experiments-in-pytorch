@@ -25,6 +25,10 @@ class DigitMLP(nn.Module):
     def forward(self, features: torch.Tensor) -> torch.Tensor:
         return self.net(features)
 
+    def encode(self, features: torch.Tensor) -> torch.Tensor:
+        """Return the penultimate representation used by the output classifier."""
+        return self.net[:-1](features)
+
 
 def count_parameters(model: nn.Module) -> int:
     return sum(parameter.numel() for parameter in model.parameters())

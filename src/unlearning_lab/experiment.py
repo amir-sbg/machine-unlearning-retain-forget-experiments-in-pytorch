@@ -27,6 +27,7 @@ from .metrics import (
     membership_signal_summary,
     method_scorecard,
     parameter_distance_summary,
+    representation_similarity_summary,
     pareto_frontier,
     retained_class_damage,
     save_json,
@@ -80,6 +81,13 @@ def select_class(split: Split, class_id: int) -> Split:
     mask = split.labels == class_id
     if not np.any(mask):
         raise ValueError(f"split does not contain class {class_id}")
+    return Split(features=split.features[mask], labels=split.labels[mask])
+
+
+def exclude_class(split: Split, class_id: int) -> Split:
+    mask = split.labels != class_id
+    if not np.any(mask):
+        raise ValueError(f"split does not contain retained classes outside {class_id}")
     return Split(features=split.features[mask], labels=split.labels[mask])
 
 
@@ -229,6 +237,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         for name, model in models.items()
     }
     test_forget = select_class(data.test, data.forget_class)
+    test_retain = exclude_class(data.test, data.forget_class)
     membership_signals = {
         name: membership_signal_summary(
             data.train_forget.labels,
@@ -288,6 +297,17 @@ def run_experiment(config: ExperimentConfig) -> dict:
         name: parameter_distance_summary(models["exact_retrain"], model)
         for name, model in models.items()
     }
+    representation_similarities = {
+        name: {
+            "retain": representation_similarity_summary(
+                models["exact_retrain"], model, test_retain, device
+            ),
+            "forget": representation_similarity_summary(
+                models["exact_retrain"], model, test_forget, device
+            ),
+        }
+        for name, model in models.items()
+    }
     calibration_reports = {
         name: expected_calibration_error(
             data.test.labels,
@@ -324,6 +344,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 **forget_rank_profiles[name],
                 **distribution_gaps[name],
                 **parameter_distances[name],
+                "retain_representation_cka": representation_similarities[name]["retain"]["linear_cka"],
+                "forget_representation_cka": representation_similarities[name]["forget"]["linear_cka"],
+                "retain_representation_drift": representation_similarities[name]["retain"]["mean_relative_representation_drift"],
+                "forget_representation_drift": representation_similarities[name]["forget"]["mean_relative_representation_drift"],
                 "calibration_ece": calibration_reports[name]["ece"],
                 "calibration_brier": calibration_reports[name]["brier"],
                 "calibration_overconfidence": calibration_reports[name]["overconfidence"],
@@ -350,6 +374,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(collateral_damage, config.report_dir / "collateral_damage.json")
     save_json(distribution_gaps, config.report_dir / "probability_drift.json")
     save_json(parameter_distances, config.report_dir / "parameter_distance.json")
+    save_json(
+        representation_similarities,
+        config.report_dir / "representation_similarity.json",
+    )
     save_json(calibration_reports, config.report_dir / "calibration_reports.json")
     save_json(gradient_conflicts, config.report_dir / "gradient_conflicts.json")
     save_json(retrain_gaps, config.report_dir / "retrain_gaps.json")
@@ -450,6 +478,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "collateral_damage": collateral_damage,
         "distribution_gaps": distribution_gaps,
         "parameter_distances": parameter_distances,
+        "representation_similarities": representation_similarities,
         "gradient_conflicts": gradient_conflicts,
         "retrain_gaps": retrain_gaps,
         "progress_reports": progress_reports,

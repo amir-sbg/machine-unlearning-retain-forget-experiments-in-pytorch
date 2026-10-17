@@ -20,6 +20,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - membership-style forget diagnostics with confidence gaps, loss gaps, and attack AUC
 - Jensen-Shannon probability drift against the exact retrain baseline
 - parameter-space distance and cosine similarity to the exact retrain reference
+- retain/forget representation similarity to exact retraining using linear CKA and feature drift
 - calibration error and Brier score for checking confidence after unlearning
 - retain/forget gradient alignment for diagnosing destructive objective conflict
 - entropy, KL-to-uniform, and total-variation checks on forgotten examples
@@ -68,6 +69,7 @@ reports/
 ├── method_scorecard.csv
 ├── probability_drift.json
 ├── parameter_distance.json
+├── representation_similarity.json
 ├── retrain_gaps.json
 ├── unlearning_progress.json
 ├── unlearning_tradeoff.png
