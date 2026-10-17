@@ -23,6 +23,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - calibration error and Brier score for checking confidence after unlearning
 - retain/forget gradient alignment for diagnosing destructive objective conflict
 - entropy, KL-to-uniform, and total-variation checks on forgotten examples
+- forgotten-class rank, reciprocal-rank, and top-k persistence diagnostics
 - scorecard runtime speedup against exact retraining
 - a compact utility/forgetting score for quick method comparison
 - normalized forgetting progress with retained-utility and balanced-progress scores
@@ -60,6 +61,7 @@ reports/
 ├── data_summary.json
 ├── experiment_summary.json
 ├── forget_confidence_curves.json
+├── forget_class_ranks.json
 ├── membership_signals.json
 ├── method_metrics.csv
 ├── method_metrics.json

@@ -23,6 +23,7 @@ from .metrics import (
     evaluate_unlearning_model,
     forget_confidence_curve,
     forget_prediction_uniformity,
+    forget_class_rank_summary,
     membership_signal_summary,
     method_scorecard,
     parameter_distance_summary,
@@ -254,6 +255,14 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
         for name, logits in test_logits.items()
     }
+    forget_rank_profiles = {
+        name: forget_class_rank_summary(
+            data.test.labels,
+            logits,
+            data.forget_class,
+        )
+        for name, logits in test_logits.items()
+    }
     classwise_reports = {
         name: classwise_accuracy(
             data.test.labels,
@@ -312,6 +321,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 **progress_reports[name],
                 **membership_signals[name],
                 **forget_uniformity[name],
+                **forget_rank_profiles[name],
                 **distribution_gaps[name],
                 **parameter_distances[name],
                 "calibration_ece": calibration_reports[name]["ece"],
@@ -335,6 +345,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(membership_signals, config.report_dir / "membership_signals.json")
     save_json(confidence_curves, config.report_dir / "forget_confidence_curves.json")
     save_json(forget_uniformity, config.report_dir / "forget_prediction_uniformity.json")
+    save_json(forget_rank_profiles, config.report_dir / "forget_class_ranks.json")
     save_json(classwise_reports, config.report_dir / "classwise_metrics.json")
     save_json(collateral_damage, config.report_dir / "collateral_damage.json")
     save_json(distribution_gaps, config.report_dir / "probability_drift.json")
@@ -380,6 +391,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
             "most_uniform_forget_predictions": max(
                 forget_uniformity,
                 key=lambda name: forget_uniformity[name]["normalized_forget_entropy"],
+            ),
+            "lowest_ranked_forget_class": max(
+                forget_rank_profiles,
+                key=lambda name: forget_rank_profiles[name]["mean_forget_class_rank"],
             ),
             "least_retained_class_damage": max(
                 collateral_damage,
@@ -430,6 +445,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "membership_signals": membership_signals,
         "confidence_curves": confidence_curves,
         "forget_uniformity": forget_uniformity,
+        "forget_rank_profiles": forget_rank_profiles,
         "classwise_reports": classwise_reports,
         "collateral_damage": collateral_damage,
         "distribution_gaps": distribution_gaps,

@@ -332,6 +332,32 @@ def forget_prediction_uniformity(
     }
 
 
+def forget_class_rank_summary(
+    labels: np.ndarray,
+    logits: np.ndarray,
+    forget_class: int,
+) -> dict[str, float | int]:
+    """Measure where the forgotten class falls in the predictive ranking."""
+
+    labels, logits = _checked_labels_logits(labels, logits, forget_class)
+    forget_mask = labels == forget_class
+    if not np.any(forget_mask):
+        raise ValueError("labels do not contain the forget class")
+    probabilities = softmax(logits[forget_mask])
+    forget_probability = probabilities[:, forget_class]
+    ranks = 1 + np.sum(probabilities > forget_probability[:, None], axis=1)
+    class_count = probabilities.shape[1]
+    return {
+        "forget_rows": int(len(ranks)),
+        "mean_forget_class_rank": float(np.mean(ranks)),
+        "median_forget_class_rank": float(np.median(ranks)),
+        "mean_reciprocal_forget_rank": float(np.mean(1.0 / ranks)),
+        "forget_class_top1_rate": float(np.mean(ranks == 1)),
+        "forget_class_top3_rate": float(np.mean(ranks <= min(3, class_count))),
+        "forget_class_bottom_half_rate": float(np.mean(ranks > class_count / 2)),
+    }
+
+
 def _mean_or_zero(values: np.ndarray) -> float:
     if values.size == 0:
         return 0.0

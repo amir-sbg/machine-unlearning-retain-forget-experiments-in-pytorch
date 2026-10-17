@@ -9,6 +9,7 @@ from unlearning_lab.metrics import (
     expected_calibration_error,
     forget_confidence_curve,
     forget_prediction_uniformity,
+    forget_class_rank_summary,
     membership_signal_summary,
     membership_attack_auc,
     method_scorecard,
@@ -208,6 +209,24 @@ def test_forget_uniformity_distinguishes_flat_and_confident_predictions() -> Non
     assert uniform["mean_kl_to_uniform"] == pytest.approx(0.0)
     assert confident["normalized_forget_entropy"] < uniform["normalized_forget_entropy"]
     assert confident["mean_total_variation_to_uniform"] > 0.5
+
+
+def test_forget_class_rank_detects_displaced_predictions() -> None:
+    labels = np.array([1, 1, 0])
+    logits = np.array(
+        [
+            [4.0, 1.0, 3.0],
+            [3.0, 2.0, 4.0],
+            [5.0, 0.0, 1.0],
+        ]
+    )
+
+    report = forget_class_rank_summary(labels, logits, forget_class=1)
+
+    assert report["forget_rows"] == 2
+    assert report["mean_forget_class_rank"] == pytest.approx(3.0)
+    assert report["forget_class_top1_rate"] == 0.0
+    assert report["forget_class_bottom_half_rate"] == 1.0
 
 
 def test_distribution_gap_compares_probability_profiles() -> None:
