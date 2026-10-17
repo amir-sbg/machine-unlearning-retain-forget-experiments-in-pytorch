@@ -27,6 +27,7 @@ from .metrics import (
     membership_signal_summary,
     method_scorecard,
     parameter_distance_summary,
+    prediction_transition_summary,
     representation_similarity_summary,
     pareto_frontier,
     retained_class_damage,
@@ -293,6 +294,15 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
         for name, logits in test_logits.items()
     }
+    prediction_transitions = {
+        name: prediction_transition_summary(
+            data.test.labels,
+            test_logits["exact_retrain"],
+            logits,
+            data.forget_class,
+        )
+        for name, logits in test_logits.items()
+    }
     parameter_distances = {
         name: parameter_distance_summary(models["exact_retrain"], model)
         for name, model in models.items()
@@ -343,6 +353,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 **forget_uniformity[name],
                 **forget_rank_profiles[name],
                 **distribution_gaps[name],
+                "prediction_agreement_to_retrain": prediction_transitions[name]["agreement_to_retrain"],
+                "retain_prediction_agreement_to_retrain": prediction_transitions[name]["retain_agreement_to_retrain"],
+                "forget_prediction_agreement_to_retrain": prediction_transitions[name]["forget_agreement_to_retrain"],
+                "retain_forget_class_intrusion_rate": prediction_transitions[name]["retain_forget_class_intrusion_rate"],
                 **parameter_distances[name],
                 "retain_representation_cka": representation_similarities[name]["retain"]["linear_cka"],
                 "forget_representation_cka": representation_similarities[name]["forget"]["linear_cka"],
@@ -373,6 +387,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(classwise_reports, config.report_dir / "classwise_metrics.json")
     save_json(collateral_damage, config.report_dir / "collateral_damage.json")
     save_json(distribution_gaps, config.report_dir / "probability_drift.json")
+    save_json(prediction_transitions, config.report_dir / "prediction_transitions.json")
     save_json(parameter_distances, config.report_dir / "parameter_distance.json")
     save_json(
         representation_similarities,
@@ -477,6 +492,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "classwise_reports": classwise_reports,
         "collateral_damage": collateral_damage,
         "distribution_gaps": distribution_gaps,
+        "prediction_transitions": prediction_transitions,
         "parameter_distances": parameter_distances,
         "representation_similarities": representation_similarities,
         "gradient_conflicts": gradient_conflicts,

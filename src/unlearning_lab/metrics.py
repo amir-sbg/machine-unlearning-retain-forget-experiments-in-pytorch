@@ -397,6 +397,65 @@ def distribution_gap_summary(
     }
 
 
+def prediction_transition_summary(
+    labels: np.ndarray,
+    reference_logits: np.ndarray,
+    candidate_logits: np.ndarray,
+    forget_class: int,
+) -> dict[str, object]:
+    """Describe class transitions from exact retraining to an unlearning method."""
+
+    labels, reference_logits = _checked_labels_logits(
+        labels,
+        reference_logits,
+        forget_class,
+    )
+    _, candidate_logits = _checked_labels_logits(
+        labels,
+        candidate_logits,
+        forget_class,
+    )
+    if reference_logits.shape != candidate_logits.shape:
+        raise ValueError("reference_logits and candidate_logits must have the same shape")
+    reference = reference_logits.argmax(axis=1)
+    candidate = candidate_logits.argmax(axis=1)
+    retain_mask = labels != forget_class
+    forget_mask = labels == forget_class
+    transitions: dict[tuple[int, int], int] = {}
+    for source, destination in zip(reference, candidate):
+        key = (int(source), int(destination))
+        transitions[key] = transitions.get(key, 0) + 1
+    rows = [
+        {
+            "retrain_prediction": source,
+            "candidate_prediction": destination,
+            "count": count,
+            "fraction": float(count / len(labels)),
+        }
+        for (source, destination), count in sorted(
+            transitions.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+    ]
+    return {
+        "rows": int(len(labels)),
+        "agreement_to_retrain": float(np.mean(reference == candidate)),
+        "retain_agreement_to_retrain": _mean_or_zero(
+            (reference[retain_mask] == candidate[retain_mask]).astype(float)
+        ),
+        "forget_agreement_to_retrain": _mean_or_zero(
+            (reference[forget_mask] == candidate[forget_mask]).astype(float)
+        ),
+        "retain_forget_class_intrusion_rate": _mean_or_zero(
+            (candidate[retain_mask] == forget_class).astype(float)
+        ),
+        "forget_class_persistence_rate": _mean_or_zero(
+            (candidate[forget_mask] == forget_class).astype(float)
+        ),
+        "transitions": rows,
+    }
+
+
 def parameter_distance_summary(
     reference_model: nn.Module,
     candidate_model: nn.Module,

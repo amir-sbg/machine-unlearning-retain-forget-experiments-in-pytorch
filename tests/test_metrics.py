@@ -16,6 +16,7 @@ from unlearning_lab.metrics import (
     parameter_distance_summary,
     representation_similarity_summary,
     pareto_frontier,
+    prediction_transition_summary,
     prediction_entropy,
     retained_class_damage,
     split_metrics,
@@ -254,6 +255,25 @@ def test_distribution_gap_rejects_shape_mismatch() -> None:
             np.zeros((2, 3)),
             forget_class=1,
         )
+
+
+def test_prediction_transitions_separate_forget_intrusion_and_persistence() -> None:
+    labels = np.array([0, 1, 1, 0])
+    reference = np.array(
+        [[4.0, 0.0], [3.0, 1.0], [2.0, 1.0], [4.0, 0.0]]
+    )
+    candidate = np.array(
+        [[4.0, 0.0], [0.0, 4.0], [2.0, 1.0], [0.0, 4.0]]
+    )
+
+    report = prediction_transition_summary(labels, reference, candidate, forget_class=1)
+
+    assert report["agreement_to_retrain"] == 0.5
+    assert report["retain_agreement_to_retrain"] == 0.5
+    assert report["forget_agreement_to_retrain"] == 0.5
+    assert report["retain_forget_class_intrusion_rate"] == 0.5
+    assert report["forget_class_persistence_rate"] == 0.5
+    assert sum(row["count"] for row in report["transitions"]) == 4
 
 
 def test_parameter_distance_is_zero_for_matching_models() -> None:
