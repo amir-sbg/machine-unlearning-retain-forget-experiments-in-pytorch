@@ -473,6 +473,41 @@ def distribution_gap_summary(
     }
 
 
+def bootstrap_forget_confidence_gap(
+    labels: np.ndarray,
+    reference_logits: np.ndarray,
+    candidate_logits: np.ndarray,
+    forget_class: int,
+    *,
+    samples: int = 1000,
+    seed: int = 0,
+) -> dict[str, float | int]:
+    labels, reference = _checked_labels_logits(labels, reference_logits, forget_class)
+    _, candidate = _checked_labels_logits(labels, candidate_logits, forget_class)
+    if reference.shape != candidate.shape:
+        raise ValueError("reference and candidate logits must have the same shape")
+    if samples < 1:
+        raise ValueError("samples must be positive")
+    mask = labels == forget_class
+    if not np.any(mask):
+        raise ValueError("labels do not contain the forget class")
+    reference_probability = softmax(reference)[mask, forget_class]
+    candidate_probability = softmax(candidate)[mask, forget_class]
+    paired_differences = candidate_probability - reference_probability
+    rng = np.random.default_rng(seed)
+    estimates = np.mean(
+        rng.choice(paired_differences, size=(samples, len(paired_differences)), replace=True),
+        axis=1,
+    )
+    return {
+        "forget_rows": int(len(paired_differences)),
+        "mean_confidence_gap_candidate_minus_retrain": float(np.mean(paired_differences)),
+        "ci95_low": float(np.quantile(estimates, 0.025)),
+        "ci95_high": float(np.quantile(estimates, 0.975)),
+        "probability_candidate_above_retrain": float(np.mean(estimates > 0.0)),
+    }
+
+
 def prediction_transition_summary(
     labels: np.ndarray,
     reference_logits: np.ndarray,

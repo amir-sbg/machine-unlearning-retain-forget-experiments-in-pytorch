@@ -17,6 +17,7 @@ import torch
 from .data import Split, dataset_summary, load_unlearning_data
 from .metrics import (
     classwise_accuracy,
+    bootstrap_forget_confidence_gap,
     compare_to_exact_retrain,
     distribution_gap_summary,
     expected_calibration_error,
@@ -299,6 +300,16 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
         for name, logits in test_logits.items()
     }
+    forget_confidence_uncertainty = {
+        name: bootstrap_forget_confidence_gap(
+            data.test.labels,
+            test_logits["exact_retrain"],
+            logits,
+            data.forget_class,
+            seed=config.seed,
+        )
+        for name, logits in test_logits.items()
+    }
     prediction_transitions = {
         name: prediction_transition_summary(
             data.test.labels,
@@ -397,6 +408,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(collateral_damage, config.report_dir / "collateral_damage.json")
     save_json(retained_class_gaps, config.report_dir / "retained_class_gaps.json")
     save_json(distribution_gaps, config.report_dir / "probability_drift.json")
+    save_json(
+        forget_confidence_uncertainty,
+        config.report_dir / "forget_confidence_uncertainty.json",
+    )
     save_json(prediction_transitions, config.report_dir / "prediction_transitions.json")
     save_json(parameter_distances, config.report_dir / "parameter_distance.json")
     save_json(
@@ -503,6 +518,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "collateral_damage": collateral_damage,
         "retained_class_gaps": retained_class_gaps,
         "distribution_gaps": distribution_gaps,
+        "forget_confidence_uncertainty": forget_confidence_uncertainty,
         "prediction_transitions": prediction_transitions,
         "parameter_distances": parameter_distances,
         "representation_similarities": representation_similarities,

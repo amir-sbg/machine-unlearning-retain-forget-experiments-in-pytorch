@@ -4,6 +4,7 @@ import torch
 
 from unlearning_lab.metrics import (
     classwise_accuracy,
+    bootstrap_forget_confidence_gap,
     compare_to_exact_retrain,
     distribution_gap_summary,
     expected_calibration_error,
@@ -288,6 +289,25 @@ def test_distribution_gap_rejects_shape_mismatch() -> None:
             np.zeros((2, 3)),
             forget_class=1,
         )
+
+
+def test_bootstrap_forget_gap_detects_excess_confidence() -> None:
+    labels = np.array([1, 1, 0])
+    retrain = np.array([[2.0, 0.0], [1.0, 0.0], [3.0, 0.0]])
+    candidate = np.array([[0.0, 3.0], [0.0, 2.0], [3.0, 0.0]])
+
+    report = bootstrap_forget_confidence_gap(
+        labels,
+        retrain,
+        candidate,
+        forget_class=1,
+        samples=200,
+        seed=4,
+    )
+
+    assert report["mean_confidence_gap_candidate_minus_retrain"] > 0.5
+    assert report["ci95_low"] > 0.0
+    assert report["probability_candidate_above_retrain"] == 1.0
 
 
 def test_prediction_transitions_separate_forget_intrusion_and_persistence() -> None:

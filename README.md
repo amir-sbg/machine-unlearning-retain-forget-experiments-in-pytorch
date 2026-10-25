@@ -21,6 +21,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - membership-style forget diagnostics with confidence gaps, loss gaps, and attack AUC
 - membership attack true-positive rates at strict false-positive operating points
 - Jensen-Shannon probability drift against the exact retrain baseline
+- paired bootstrap intervals for forget-confidence gaps to exact retraining
 - class-transition analysis against exact retraining, including retained-class intrusion
 - parameter-space distance and cosine similarity to the exact retrain reference
 - retain/forget representation similarity to exact retraining using linear CKA and feature drift
