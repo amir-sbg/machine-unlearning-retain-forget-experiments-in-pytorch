@@ -197,6 +197,48 @@ def retained_class_damage(
     }
 
 
+def retained_class_gap_summary(
+    reference_rows: list[dict[str, float | int | bool]],
+    candidate_rows: list[dict[str, float | int | bool]],
+) -> dict[str, float | int | None]:
+    reference = {
+        int(row["class_id"]): row
+        for row in reference_rows
+        if not bool(row["is_forget_class"])
+    }
+    candidate = {
+        int(row["class_id"]): row
+        for row in candidate_rows
+        if not bool(row["is_forget_class"])
+    }
+    shared = sorted(reference.keys() & candidate.keys())
+    if not shared:
+        return {
+            "retained_classes_compared": 0,
+            "worst_accuracy_drop_class": None,
+            "worst_accuracy_drop": 0.0,
+            "mean_accuracy_drop": 0.0,
+            "mean_confidence_drop": 0.0,
+        }
+    accuracy_drops = {
+        class_id: float(reference[class_id]["accuracy"]) - float(candidate[class_id]["accuracy"])
+        for class_id in shared
+    }
+    confidence_drops = [
+        float(reference[class_id]["true_class_confidence"])
+        - float(candidate[class_id]["true_class_confidence"])
+        for class_id in shared
+    ]
+    worst_class = max(shared, key=lambda class_id: accuracy_drops[class_id])
+    return {
+        "retained_classes_compared": len(shared),
+        "worst_accuracy_drop_class": worst_class,
+        "worst_accuracy_drop": accuracy_drops[worst_class],
+        "mean_accuracy_drop": float(np.mean(list(accuracy_drops.values()))),
+        "mean_confidence_drop": float(np.mean(confidence_drops)),
+    }
+
+
 def _true_label_stats(labels: np.ndarray, logits: np.ndarray) -> dict[str, float | int]:
     probabilities = np.clip(softmax(logits), 1e-12, 1.0)
     rows = np.arange(len(labels))

@@ -16,6 +16,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - metrics for retain accuracy, forget accuracy, forget-class confidence, and distance from exact retraining
 - class-wise test metrics to check collateral damage on retained classes
 - retained-class damage summaries for the weakest preserved class
+- per-class utility regression against the exact-retraining reference
 - threshold curves showing how many forget examples remain high-confidence
 - membership-style forget diagnostics with confidence gaps, loss gaps, and attack AUC
 - membership attack true-positive rates at strict false-positive operating points

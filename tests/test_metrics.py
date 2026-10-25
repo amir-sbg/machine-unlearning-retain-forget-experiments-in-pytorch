@@ -20,6 +20,7 @@ from unlearning_lab.metrics import (
     prediction_transition_summary,
     prediction_entropy,
     retained_class_damage,
+    retained_class_gap_summary,
     split_metrics,
     unlearning_progress_summary,
 )
@@ -142,6 +143,25 @@ def test_retained_class_damage_finds_worst_retained_class() -> None:
     assert report["worst_retained_class"] == 2
     assert report["worst_retained_accuracy"] == 0.7
     assert report["mean_retained_accuracy"] == pytest.approx(0.8)
+
+
+def test_retained_class_gap_finds_worst_regression_from_retraining() -> None:
+    reference = [
+        {"class_id": 0, "is_forget_class": False, "accuracy": 0.9, "true_class_confidence": 0.8},
+        {"class_id": 1, "is_forget_class": True, "accuracy": 0.0, "true_class_confidence": 0.1},
+        {"class_id": 2, "is_forget_class": False, "accuracy": 0.8, "true_class_confidence": 0.7},
+    ]
+    candidate = [
+        {"class_id": 0, "is_forget_class": False, "accuracy": 0.85, "true_class_confidence": 0.7},
+        {"class_id": 1, "is_forget_class": True, "accuracy": 0.0, "true_class_confidence": 0.1},
+        {"class_id": 2, "is_forget_class": False, "accuracy": 0.5, "true_class_confidence": 0.4},
+    ]
+
+    report = retained_class_gap_summary(reference, candidate)
+
+    assert report["worst_accuracy_drop_class"] == 2
+    assert report["worst_accuracy_drop"] == pytest.approx(0.3)
+    assert report["mean_accuracy_drop"] == pytest.approx(0.175)
 
 
 def test_membership_signal_compares_train_and_holdout_forget_examples() -> None:

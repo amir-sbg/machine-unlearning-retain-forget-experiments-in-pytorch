@@ -31,6 +31,7 @@ from .metrics import (
     representation_similarity_summary,
     pareto_frontier,
     retained_class_damage,
+    retained_class_gap_summary,
     save_json,
     unlearning_progress_summary,
 )
@@ -285,6 +286,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
         name: retained_class_damage(rows)
         for name, rows in classwise_reports.items()
     }
+    retained_class_gaps = {
+        name: retained_class_gap_summary(classwise_reports["exact_retrain"], rows)
+        for name, rows in classwise_reports.items()
+    }
     distribution_gaps = {
         name: distribution_gap_summary(
             data.test.labels,
@@ -370,6 +375,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
                     f"collateral_{key}": value
                     for key, value in collateral_damage[name].items()
                 },
+                **{
+                    f"retrain_{key}": value
+                    for key, value in retained_class_gaps[name].items()
+                },
             }
             for name, metrics in method_metrics.items()
         ]
@@ -386,6 +395,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(forget_rank_profiles, config.report_dir / "forget_class_ranks.json")
     save_json(classwise_reports, config.report_dir / "classwise_metrics.json")
     save_json(collateral_damage, config.report_dir / "collateral_damage.json")
+    save_json(retained_class_gaps, config.report_dir / "retained_class_gaps.json")
     save_json(distribution_gaps, config.report_dir / "probability_drift.json")
     save_json(prediction_transitions, config.report_dir / "prediction_transitions.json")
     save_json(parameter_distances, config.report_dir / "parameter_distance.json")
@@ -491,6 +501,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "forget_rank_profiles": forget_rank_profiles,
         "classwise_reports": classwise_reports,
         "collateral_damage": collateral_damage,
+        "retained_class_gaps": retained_class_gaps,
         "distribution_gaps": distribution_gaps,
         "prediction_transitions": prediction_transitions,
         "parameter_distances": parameter_distances,
