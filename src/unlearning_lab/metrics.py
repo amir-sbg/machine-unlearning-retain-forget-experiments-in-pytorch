@@ -222,6 +222,36 @@ def membership_attack_auc(member_scores: np.ndarray, nonmember_scores: np.ndarra
     return float((wins + 0.5 * ties) / comparisons.size)
 
 
+def membership_attack_operating_points(
+    member_scores: np.ndarray,
+    nonmember_scores: np.ndarray,
+    false_positive_rates: tuple[float, ...] = (0.01, 0.05, 0.10),
+) -> list[dict[str, float]]:
+    members = np.asarray(member_scores, dtype=float).reshape(-1)
+    nonmembers = np.asarray(nonmember_scores, dtype=float).reshape(-1)
+    if members.size == 0 or nonmembers.size == 0:
+        raise ValueError("member and nonmember scores must not be empty")
+    if not np.all(np.isfinite(members)) or not np.all(np.isfinite(nonmembers)):
+        raise ValueError("membership scores must be finite")
+    if any(not 0.0 < rate < 1.0 for rate in false_positive_rates):
+        raise ValueError("false positive rates must be inside (0, 1)")
+
+    rows = []
+    sorted_nonmembers = np.sort(nonmembers)
+    for target_fpr in sorted(false_positive_rates):
+        rank = int(np.ceil((1.0 - target_fpr) * len(sorted_nonmembers))) - 1
+        threshold = float(sorted_nonmembers[np.clip(rank, 0, len(sorted_nonmembers) - 1)])
+        rows.append(
+            {
+                "target_false_positive_rate": float(target_fpr),
+                "threshold": threshold,
+                "observed_false_positive_rate": float(np.mean(nonmembers >= threshold)),
+                "true_positive_rate": float(np.mean(members >= threshold)),
+            }
+        )
+    return rows
+
+
 def membership_signal_summary(
     train_forget_labels: np.ndarray,
     train_forget_logits: np.ndarray,
@@ -263,6 +293,10 @@ def membership_signal_summary(
         "nll_gap_holdout_minus_train": nll_gap,
         "membership_signal": float(max(0.0, confidence_gap) + max(0.0, nll_gap)),
         "confidence_attack_auc": membership_attack_auc(
+            train_probabilities,
+            holdout_probabilities,
+        ),
+        "attack_operating_points": membership_attack_operating_points(
             train_probabilities,
             holdout_probabilities,
         ),

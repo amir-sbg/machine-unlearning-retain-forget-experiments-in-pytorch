@@ -18,6 +18,7 @@ This project uses the scikit-learn digits dataset instead of a large LLM because
 - retained-class damage summaries for the weakest preserved class
 - threshold curves showing how many forget examples remain high-confidence
 - membership-style forget diagnostics with confidence gaps, loss gaps, and attack AUC
+- membership attack true-positive rates at strict false-positive operating points
 - Jensen-Shannon probability drift against the exact retrain baseline
 - class-transition analysis against exact retraining, including retained-class intrusion
 - parameter-space distance and cosine similarity to the exact retrain reference

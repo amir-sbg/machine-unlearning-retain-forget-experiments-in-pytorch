@@ -12,6 +12,7 @@ from unlearning_lab.metrics import (
     forget_class_rank_summary,
     membership_signal_summary,
     membership_attack_auc,
+    membership_attack_operating_points,
     method_scorecard,
     parameter_distance_summary,
     representation_similarity_summary,
@@ -163,6 +164,18 @@ def test_membership_signal_compares_train_and_holdout_forget_examples() -> None:
 def test_membership_attack_auc_handles_ties() -> None:
     assert membership_attack_auc(np.array([0.9, 0.8]), np.array([0.2, 0.3])) == 1.0
     assert membership_attack_auc(np.array([0.5]), np.array([0.5])) == 0.5
+
+
+def test_membership_attack_operating_points_report_low_fpr_recall() -> None:
+    rows = membership_attack_operating_points(
+        np.array([0.95, 0.90, 0.80]),
+        np.array([0.10, 0.20, 0.30, 0.40]),
+        false_positive_rates=(0.05, 0.25),
+    )
+
+    assert len(rows) == 2
+    assert all(row["true_positive_rate"] == 1.0 for row in rows)
+    assert rows[0]["threshold"] >= rows[1]["threshold"]
 
 
 def test_membership_signal_rejects_mixed_forget_split() -> None:
