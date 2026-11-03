@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
@@ -664,6 +665,66 @@ def fisher_weighted_distance_summary(
         "fisher_normalized_distance_to_retrain": total / max(total_fisher_mass, 1e-12),
         "fisher_mass": total_fisher_mass,
         "layer_contributions": layer_contributions,
+    }
+
+
+def interpolation_barrier_summary(
+    reference_model: nn.Module,
+    candidate_model: nn.Module,
+    split: Split,
+    device: torch.device,
+    points: int = 7,
+    batch_size: int = 256,
+) -> dict[str, float | int | list[dict[str, float]]]:
+    """Trace cross-entropy along the linear path between two model states."""
+
+    if points < 3:
+        raise ValueError("points must be at least three")
+    reference_state = reference_model.state_dict()
+    candidate_state = candidate_model.state_dict()
+    if reference_state.keys() != candidate_state.keys():
+        raise ValueError("models must expose the same state entries")
+    for name in reference_state:
+        if reference_state[name].shape != candidate_state[name].shape:
+            raise ValueError(f"state shape mismatch for {name}")
+
+    probe = copy.deepcopy(reference_model).to(device)
+    loader = make_loader(split, batch_size=batch_size, shuffle=False)
+    loss_fn = nn.CrossEntropyLoss(reduction="sum")
+    curve: list[dict[str, float]] = []
+    for alpha in np.linspace(0.0, 1.0, points):
+        state = {
+            name: (
+                reference_state[name].detach().to(device) * (1.0 - float(alpha))
+                + candidate_state[name].detach().to(device) * float(alpha)
+            )
+            for name in reference_state
+        }
+        probe.load_state_dict(state)
+        probe.eval()
+        total_loss = 0.0
+        total_rows = 0
+        with torch.inference_mode():
+            for features, labels in loader:
+                labels = labels.to(device)
+                total_loss += float(loss_fn(probe(features.to(device)), labels))
+                total_rows += len(labels)
+        curve.append({"alpha": float(alpha), "loss": total_loss / total_rows})
+
+    start_loss = curve[0]["loss"]
+    end_loss = curve[-1]["loss"]
+    for row in curve:
+        linear_loss = (1.0 - row["alpha"]) * start_loss + row["alpha"] * end_loss
+        row["barrier_above_linear_path"] = row["loss"] - linear_loss
+    peak = max(curve, key=lambda row: row["barrier_above_linear_path"])
+    return {
+        "rows": int(len(split.labels)),
+        "points": points,
+        "reference_loss": start_loss,
+        "candidate_loss": end_loss,
+        "max_loss_barrier": max(0.0, peak["barrier_above_linear_path"]),
+        "barrier_alpha": peak["alpha"],
+        "curve": curve,
     }
 
 

@@ -26,6 +26,7 @@ from .metrics import (
     forget_confidence_curve,
     forget_prediction_uniformity,
     forget_class_rank_summary,
+    interpolation_barrier_summary,
     membership_signal_summary,
     method_scorecard,
     parameter_distance_summary,
@@ -334,6 +335,17 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
         for name, model in models.items()
     }
+    interpolation_profiles = {
+        name: {
+            "retain": interpolation_barrier_summary(
+                models["exact_retrain"], model, test_retain, device
+            ),
+            "forget": interpolation_barrier_summary(
+                models["exact_retrain"], model, test_forget, device
+            ),
+        }
+        for name, model in models.items()
+    }
     representation_similarities = {
         name: {
             "retain": representation_similarity_summary(
@@ -391,6 +403,12 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 "fisher_normalized_distance_to_retrain": fisher_distances[name][
                     "fisher_normalized_distance_to_retrain"
                 ],
+                "retain_interpolation_barrier": interpolation_profiles[name]["retain"][
+                    "max_loss_barrier"
+                ],
+                "forget_interpolation_barrier": interpolation_profiles[name]["forget"][
+                    "max_loss_barrier"
+                ],
                 "retain_representation_cka": representation_similarities[name]["retain"]["linear_cka"],
                 "forget_representation_cka": representation_similarities[name]["forget"]["linear_cka"],
                 "retain_representation_drift": representation_similarities[name]["retain"]["mean_relative_representation_drift"],
@@ -432,6 +450,10 @@ def run_experiment(config: ExperimentConfig) -> dict:
     save_json(prediction_transitions, config.report_dir / "prediction_transitions.json")
     save_json(parameter_distances, config.report_dir / "parameter_distance.json")
     save_json(fisher_distances, config.report_dir / "fisher_distance.json")
+    save_json(
+        interpolation_profiles,
+        config.report_dir / "loss_interpolation.json",
+    )
     save_json(
         representation_similarities,
         config.report_dir / "representation_similarity.json",
@@ -546,6 +568,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "prediction_transitions": prediction_transitions,
         "parameter_distances": parameter_distances,
         "fisher_distances": fisher_distances,
+        "interpolation_profiles": interpolation_profiles,
         "representation_similarities": representation_similarities,
         "gradient_conflicts": gradient_conflicts,
         "retrain_gaps": retrain_gaps,

@@ -16,6 +16,7 @@ from unlearning_lab.metrics import (
     membership_attack_auc,
     membership_attack_operating_points,
     method_scorecard,
+    interpolation_barrier_summary,
     parameter_distance_summary,
     representation_similarity_summary,
     pareto_frontier,
@@ -367,6 +368,43 @@ def test_fisher_distance_weights_functionally_active_parameters() -> None:
     assert exact["fisher_quadratic_distance_to_retrain"] == pytest.approx(0.0)
     assert shifted["fisher_quadratic_distance_to_retrain"] > 0.0
     assert shifted["layer_contributions"]["net.5.weight"] > 0.0
+
+
+def test_interpolation_barrier_preserves_endpoint_losses() -> None:
+    torch.manual_seed(11)
+    reference = DigitMLP(hidden_dim=32, dropout=0.0)
+    candidate = DigitMLP(hidden_dim=32, dropout=0.0)
+    candidate.load_state_dict(reference.state_dict())
+    with torch.no_grad():
+        candidate.net[-1].bias.add_(0.15)
+    split = Split(
+        features=np.random.default_rng(11).normal(size=(16, 64)).astype(np.float32),
+        labels=np.arange(16) % 10,
+    )
+
+    report = interpolation_barrier_summary(
+        reference, candidate, split, torch.device("cpu"), points=5
+    )
+
+    assert report["points"] == 5
+    assert report["curve"][0]["alpha"] == 0.0
+    assert report["curve"][-1]["alpha"] == 1.0
+    assert report["curve"][0]["loss"] == pytest.approx(report["reference_loss"])
+    assert report["curve"][-1]["loss"] == pytest.approx(report["candidate_loss"])
+    assert report["max_loss_barrier"] >= 0.0
+
+
+def test_interpolation_barrier_requires_an_interior_point() -> None:
+    model = DigitMLP(hidden_dim=32, dropout=0.0)
+    split = Split(
+        features=np.zeros((2, 64), dtype=np.float32),
+        labels=np.array([0, 1]),
+    )
+
+    with pytest.raises(ValueError, match="at least three"):
+        interpolation_barrier_summary(
+            model, model, split, torch.device("cpu"), points=2
+        )
 
 
 def test_representation_similarity_detects_hidden_feature_drift() -> None:
