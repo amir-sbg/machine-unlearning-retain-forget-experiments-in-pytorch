@@ -22,6 +22,7 @@ from .metrics import (
     distribution_gap_summary,
     expected_calibration_error,
     evaluate_unlearning_model,
+    fisher_weighted_distance_summary,
     forget_confidence_curve,
     forget_prediction_uniformity,
     forget_class_rank_summary,
@@ -323,6 +324,16 @@ def run_experiment(config: ExperimentConfig) -> dict:
         name: parameter_distance_summary(models["exact_retrain"], model)
         for name, model in models.items()
     }
+    fisher_distances = {
+        name: fisher_weighted_distance_summary(
+            models["exact_retrain"],
+            model,
+            data.train_retain,
+            device,
+            batch_size=config.batch_size,
+        )
+        for name, model in models.items()
+    }
     representation_similarities = {
         name: {
             "retain": representation_similarity_summary(
@@ -374,6 +385,12 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 "forget_prediction_agreement_to_retrain": prediction_transitions[name]["forget_agreement_to_retrain"],
                 "retain_forget_class_intrusion_rate": prediction_transitions[name]["retain_forget_class_intrusion_rate"],
                 **parameter_distances[name],
+                "fisher_quadratic_distance_to_retrain": fisher_distances[name][
+                    "fisher_quadratic_distance_to_retrain"
+                ],
+                "fisher_normalized_distance_to_retrain": fisher_distances[name][
+                    "fisher_normalized_distance_to_retrain"
+                ],
                 "retain_representation_cka": representation_similarities[name]["retain"]["linear_cka"],
                 "forget_representation_cka": representation_similarities[name]["forget"]["linear_cka"],
                 "retain_representation_drift": representation_similarities[name]["retain"]["mean_relative_representation_drift"],
@@ -414,6 +431,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     )
     save_json(prediction_transitions, config.report_dir / "prediction_transitions.json")
     save_json(parameter_distances, config.report_dir / "parameter_distance.json")
+    save_json(fisher_distances, config.report_dir / "fisher_distance.json")
     save_json(
         representation_similarities,
         config.report_dir / "representation_similarity.json",
@@ -476,6 +494,12 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 parameter_distances,
                 key=lambda name: parameter_distances[name]["relative_l2_distance_to_retrain"],
             ),
+            "closest_fisher_weighted_profile": min(
+                fisher_distances,
+                key=lambda name: fisher_distances[name][
+                    "fisher_quadratic_distance_to_retrain"
+                ],
+            ),
             "best_calibrated_method": min(
                 calibration_reports,
                 key=lambda name: calibration_reports[name]["ece"],
@@ -521,6 +545,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "forget_confidence_uncertainty": forget_confidence_uncertainty,
         "prediction_transitions": prediction_transitions,
         "parameter_distances": parameter_distances,
+        "fisher_distances": fisher_distances,
         "representation_similarities": representation_similarities,
         "gradient_conflicts": gradient_conflicts,
         "retrain_gaps": retrain_gaps,

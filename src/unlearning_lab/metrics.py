@@ -8,7 +8,7 @@ import torch
 from torch import nn
 
 from .data import Split, UnlearningData
-from .train import predict_logits
+from .train import make_loader, predict_logits
 
 DEFAULT_CONFIDENCE_THRESHOLDS = (0.10, 0.25, 0.50, 0.75)
 
@@ -600,6 +600,70 @@ def parameter_distance_summary(
         "cosine_similarity_to_retrain": cosine,
         "mean_absolute_parameter_shift": float(torch.mean(torch.abs(difference))),
         "max_absolute_parameter_shift": float(torch.max(torch.abs(difference))),
+    }
+
+
+def fisher_weighted_distance_summary(
+    reference_model: nn.Module,
+    candidate_model: nn.Module,
+    split: Split,
+    device: torch.device,
+    batch_size: int = 64,
+) -> dict[str, float | int | dict[str, float]]:
+    """Measure parameter drift using a diagonal empirical-Fisher approximation."""
+
+    if batch_size < 1:
+        raise ValueError("batch_size must be positive")
+    reference = dict(reference_model.named_parameters())
+    candidate = dict(candidate_model.named_parameters())
+    if reference.keys() != candidate.keys():
+        raise ValueError("models must expose the same parameter names")
+    for name in reference:
+        if reference[name].shape != candidate[name].shape:
+            raise ValueError(f"parameter shape mismatch for {name}")
+
+    loader = make_loader(split, batch_size=batch_size, shuffle=False)
+    reference_model.to(device)
+    candidate_model.to(device)
+    reference_model.eval()
+    candidate_model.eval()
+    fisher = {name: torch.zeros_like(parameter, device=device) for name, parameter in reference.items()}
+    total_rows = 0
+    loss_fn = nn.CrossEntropyLoss()
+
+    for features, labels in loader:
+        features = features.to(device)
+        labels = labels.to(device)
+        reference_model.zero_grad(set_to_none=True)
+        loss_fn(reference_model(features), labels).backward()
+        rows = len(labels)
+        total_rows += rows
+        for name, parameter in reference.items():
+            if parameter.grad is not None:
+                fisher[name].add_(parameter.grad.detach().square(), alpha=rows)
+
+    reference_model.zero_grad(set_to_none=True)
+    if total_rows == 0:
+        raise ValueError("split must not be empty")
+
+    layer_contributions: dict[str, float] = {}
+    total = 0.0
+    total_fisher_mass = 0.0
+    for name, reference_parameter in reference.items():
+        diagonal = fisher[name] / total_rows
+        delta = candidate[name].detach().to(device) - reference_parameter.detach().to(device)
+        contribution = float(torch.sum(diagonal * delta.square()).detach().cpu())
+        layer_contributions[name] = contribution
+        total += contribution
+        total_fisher_mass += float(torch.sum(diagonal).detach().cpu())
+
+    return {
+        "rows": total_rows,
+        "fisher_quadratic_distance_to_retrain": total,
+        "fisher_rms_distance_to_retrain": float(np.sqrt(max(total, 0.0))),
+        "fisher_normalized_distance_to_retrain": total / max(total_fisher_mass, 1e-12),
+        "fisher_mass": total_fisher_mass,
+        "layer_contributions": layer_contributions,
     }
 
 

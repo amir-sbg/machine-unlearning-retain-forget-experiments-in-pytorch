@@ -8,6 +8,7 @@ from unlearning_lab.metrics import (
     compare_to_exact_retrain,
     distribution_gap_summary,
     expected_calibration_error,
+    fisher_weighted_distance_summary,
     forget_confidence_curve,
     forget_prediction_uniformity,
     forget_class_rank_summary,
@@ -342,6 +343,30 @@ def test_parameter_distance_is_zero_for_matching_models() -> None:
     assert exact["l2_distance_to_retrain"] == 0.0
     assert exact["cosine_similarity_to_retrain"] == pytest.approx(1.0)
     assert shifted["relative_l2_distance_to_retrain"] > 0.0
+
+
+def test_fisher_distance_weights_functionally_active_parameters() -> None:
+    torch.manual_seed(7)
+    reference = DigitMLP(hidden_dim=32, dropout=0.0)
+    candidate = DigitMLP(hidden_dim=32, dropout=0.0)
+    candidate.load_state_dict(reference.state_dict())
+    split = Split(
+        features=np.random.default_rng(7).normal(size=(20, 64)).astype(np.float32),
+        labels=np.arange(20) % 10,
+    )
+
+    exact = fisher_weighted_distance_summary(
+        reference, candidate, split, torch.device("cpu"), batch_size=5
+    )
+    with torch.no_grad():
+        candidate.net[-1].weight[0].add_(0.2)
+    shifted = fisher_weighted_distance_summary(
+        reference, candidate, split, torch.device("cpu"), batch_size=5
+    )
+
+    assert exact["fisher_quadratic_distance_to_retrain"] == pytest.approx(0.0)
+    assert shifted["fisher_quadratic_distance_to_retrain"] > 0.0
+    assert shifted["layer_contributions"]["net.5.weight"] > 0.0
 
 
 def test_representation_similarity_detects_hidden_feature_drift() -> None:
