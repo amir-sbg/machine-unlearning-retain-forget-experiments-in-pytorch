@@ -203,6 +203,14 @@ def test_membership_attack_operating_points_report_low_fpr_recall() -> None:
     assert len(rows) == 2
     assert all(row["true_positive_rate"] == 1.0 for row in rows)
     assert rows[0]["threshold"] >= rows[1]["threshold"]
+    assert all(row["observed_false_positive_rate"] <= row["target_false_positive_rate"] for row in rows)
+
+
+def test_membership_operating_point_respects_fpr_with_tied_nonmembers() -> None:
+    row = membership_attack_operating_points(
+        np.array([0.9]), np.array([0.2, 0.2, 0.4, 0.4]), (0.25,)
+    )[0]
+    assert row["observed_false_positive_rate"] <= 0.25
 
 
 def test_membership_signal_rejects_mixed_forget_split() -> None:

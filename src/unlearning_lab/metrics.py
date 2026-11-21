@@ -286,7 +286,7 @@ def membership_attack_operating_points(
     sorted_nonmembers = np.sort(nonmembers)
     for target_fpr in sorted(false_positive_rates):
         rank = int(np.ceil((1.0 - target_fpr) * len(sorted_nonmembers))) - 1
-        threshold = float(sorted_nonmembers[np.clip(rank, 0, len(sorted_nonmembers) - 1)])
+        threshold = float(np.nextafter(sorted_nonmembers[np.clip(rank, 0, len(sorted_nonmembers) - 1)], np.inf))
         rows.append(
             {
                 "target_false_positive_rate": float(target_fpr),
