@@ -81,6 +81,10 @@ def test_prediction_entropy_is_lower_for_confident_logits() -> None:
     assert confident < uncertain
 
 
+def test_membership_auc_counts_ties_without_pairwise_matrix() -> None:
+    assert membership_attack_auc(np.array([0.5, 0.8]), np.array([0.5, 0.7])) == pytest.approx(0.625)
+
+
 def test_expected_calibration_error_reports_confidence_gap() -> None:
     report = expected_calibration_error(
         labels=np.array([0, 1, 1, 0]),

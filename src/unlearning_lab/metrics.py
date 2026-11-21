@@ -259,10 +259,13 @@ def membership_attack_auc(member_scores: np.ndarray, nonmember_scores: np.ndarra
         raise ValueError("member and nonmember scores must not be empty")
     if not np.all(np.isfinite(members)) or not np.all(np.isfinite(nonmembers)):
         raise ValueError("membership scores must be finite")
-    comparisons = members[:, None] - nonmembers[None, :]
-    wins = np.sum(comparisons > 0.0)
-    ties = np.sum(comparisons == 0.0)
-    return float((wins + 0.5 * ties) / comparisons.size)
+    sorted_nonmembers = np.sort(nonmembers)
+    wins = np.searchsorted(sorted_nonmembers, members, side="left").sum()
+    ties = (
+        np.searchsorted(sorted_nonmembers, members, side="right")
+        - np.searchsorted(sorted_nonmembers, members, side="left")
+    ).sum()
+    return float((wins + 0.5 * ties) / (members.size * nonmembers.size))
 
 
 def membership_attack_operating_points(
